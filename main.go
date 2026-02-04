@@ -1,93 +1,80 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
-	"github.com/ahmedsat/erp-reports-cli/commands"
-	"github.com/ahmedsat/erp-reports-cli/erp"
-	"github.com/ahmedsat/erp-reports-cli/utils"
+	"github.com/ahmedsat/ebda-cli/commands"
+	"github.com/ahmedsat/ebda-cli/config"
+	"github.com/ahmedsat/ebda-cli/frappe"
 )
 
-var subcommands = []string{"totals", "farms", "farm-applications", "salary", "follow-up"}
+var executable string
 
-func usage() {
-	fmt.Printf("Usage: %s subcommand [options]\n", os.Args[0])
-	fmt.Println("subcommands:")
-	for _, subcommand := range subcommands {
-		fmt.Printf("  %s\n", subcommand)
+type subcommand interface {
+	Name() string
+	Usage() string
+	Run([]string) error
+	Result() any
+}
+
+var subcommands map[string]subcommand
+
+func init() {
+	subcommands = make(map[string]subcommand)
+	subcommands["help"] = &HelpCommand{}
+	subcommands["follow-up"] = &commands.FollowUpCommand{}
+	subcommands["pgs"] = &commands.Pgs{}
+}
+
+func usage(executable string) {
+	fmt.Fprintf(os.Stderr, "Usage: %s subcommand [options]\n", executable)
+	fmt.Fprintln(os.Stderr, "subcommands:")
+	for subcommand := range subcommands {
+		fmt.Fprintf(os.Stderr, "  %s\n", subcommand)
 	}
 }
 
 func main() {
 
-	r, err := erp.Login()
+	err := config.Configure()
 	if err != nil {
-		utils.HandelErr(err)
-	}
-
-	fmt.Fprintln(os.Stderr, "Logged in as: ", r)
-
-	if len(os.Args) < 2 {
-		usage()
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	switch os.Args[1] {
-	case "totals":
-		cmd := flag.NewFlagSet("totals", flag.ExitOnError)
-		opt := commands.TotalsOptions{}
-		opt.AddFlags(cmd)
-
-		utils.HandelErr(cmd.Parse(os.Args[2:]))
-
-		utils.HandelErr(commands.Totals(opt))
-
-	case "farms":
-		cmd := flag.NewFlagSet("farms", flag.ExitOnError)
-		opt := commands.FarmsOptions{}
-		opt.AddFlags(cmd)
-
-		utils.HandelErr(cmd.Parse(os.Args[2:]))
-
-		utils.HandelErr(commands.Farms(opt))
-
-	case "farm-applications":
-		utils.HandelErr(commands.FarmApplications(os.Args[2:]))
-	case "training":
-		cmd := flag.NewFlagSet("training", flag.ExitOnError)
-		opt := commands.TrainingOptions{}
-		opt.AddFlags(cmd)
-
-		utils.HandelErr(cmd.Parse(os.Args[2:]))
-
-		utils.HandelErr(commands.Training(opt))
-
-	case "salary":
-		cmd := flag.NewFlagSet("salary", flag.ExitOnError)
-		opt := commands.SalaryOptions{}
-		opt.AddFlags(cmd)
-
-		utils.HandelErr(cmd.Parse(os.Args[2:]))
-
-		utils.HandelErr(commands.Salary(opt))
-
-	case "map":
-		utils.HandelErr(commands.Map(os.Args[2:]))
-
-	case "pgs":
-		utils.HandelErr(commands.Pgs(os.Args[2:]))
-
-	case "records":
-		utils.HandelErr(commands.Records(os.Args[2:]))
-	case "follow-up":
-		utils.HandelErr(commands.FollowUp(os.Args[2:]))
-
-	case "help":
-		usage()
-
-	default:
-		usage()
+	res, err := frappe.Login()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
+	fmt.Fprintf(os.Stderr, "Logged result %+v\n", res)
+
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "not subcommand provided")
+		usage(os.Args[0])
+		os.Exit(1)
+	}
+
+	executable = os.Args[0]
+	subcommand := os.Args[1]
+
+	sbc, ok := subcommands[subcommand]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "unknown subcommand: %s\n", subcommand)
+		usage(executable)
+		os.Exit(1)
+	}
+
+	err = sbc.Run(os.Args[2:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%+v\n", err)
+		os.Exit(1)
+	}
+
+	result := sbc.Result()
+	if result != nil {
+		fmt.Printf("%+v\n", result)
+	}
+
 }

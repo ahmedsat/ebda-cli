@@ -2,40 +2,36 @@ package commands
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"os"
+	"strings"
+
+	"github.com/ahmedsat/ebda-cli/kobo"
 )
 
-func Pgs(args []string) (err error) {
-	defer func() {
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "PGS")
-		}
-	}()
-	fmt.Println("PGS")
+type Pgs struct {
+	Submissions []kobo.PGSNew
+}
 
-	formUrl := "https://kf.kobotoolbox.org/api/v2/assets/aX4NJWgge6tooXjfSYXhrq" + args[0]
-	req, err := http.NewRequest("GET", formUrl, nil)
-	if err != nil {
-		return
+// Name implements [main.subcommand].
+func (p *Pgs) Name() string {
+	panic("unimplemented")
+}
+
+// Result implements [main.subcommand].
+func (p *Pgs) Result() any {
+	sb := strings.Builder{}
+	for _, s := range p.Submissions {
+		fmt.Fprintf(&sb, "%s\t%s\t%s\t%s\n", s.FormID, s.VisitDate, s.EngName, s.Label)
 	}
+	return sb.String()
+}
 
-	token := os.Getenv("KOBO_AUTH_TOKEN")
-	req.Header.Set("Authorization", "Token "+token)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		err = fmt.Errorf("http error: %d", res.StatusCode)
-		return
-	}
-
-	io.Copy(os.Stderr, res.Body)
-
+// Run implements [main.subcommand].
+func (p *Pgs) Run([]string) (err error) {
+	p.Submissions, err = kobo.GetAssets[kobo.PGSNew]()
 	return
+}
+
+// Usage implements [main.subcommand].
+func (p *Pgs) Usage() string {
+	panic("unimplemented")
 }
