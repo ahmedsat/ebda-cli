@@ -1,9 +1,11 @@
 package frappe
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -114,6 +116,8 @@ func Get1[T FrappeDoctype](id string) (result T, err error) {
 
 	decoder := json.NewDecoder(resp.Body)
 
+	decoder.DisallowUnknownFields()
+
 	var response = struct {
 		Data T `json:"data"`
 	}{
@@ -126,5 +130,95 @@ func Get1[T FrappeDoctype](id string) (result T, err error) {
 	}
 
 	result = response.Data
+	return
+}
+
+func Delete[T FrappeDoctype](id string) (err error) {
+
+	var DeleteResponse = struct {
+		Data string `json:"data"`
+	}{}
+
+	var t T
+	url, err := url.JoinPath(config.ErpBaseUrl, "/api/resource", t.DocTypeName(), id)
+	if err != nil {
+		return
+	}
+
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&DeleteResponse)
+	if err != nil {
+		return
+	}
+
+	if resp.StatusCode != 202 {
+		utils.SaveHttpResponse(*resp)
+		err = errors.Join(fmt.Errorf("http error: %d", resp.StatusCode), errors.New(DeleteResponse.Data))
+		return
+	}
+
+	return
+}
+
+func Create[T FrappeDoctype](data T) (result T, err error) {
+
+	url, err := url.JoinPath(config.ErpBaseUrl, "/api/resource", data.DocTypeName())
+	if err != nil {
+		return
+	}
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+
+	req.Body = io.NopCloser(bytes.NewReader(jsonData))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.SaveHttpResponse(*resp)
+		err = errors.Join(fmt.Errorf("http error: %d", resp.StatusCode), errors.New("failed to get response"))
+		return
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+
+	var response = struct {
+		Data T `json:"data"`
+	}{
+		Data: data,
+	}
+
+	err = decoder.Decode(&response)
+	if err != nil {
+		return
+	}
+
+	result = response.Data
+
 	return
 }

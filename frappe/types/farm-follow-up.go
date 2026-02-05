@@ -182,7 +182,7 @@ func (f *FarmFollowUp) Rate() error {
 		{"لا يوجد تاريخ زيارة", f.VisitDate != "", 3},
 		{"اسم المتابع غير موجود", f.FollowerName != "", 5},
 		{"صورة المتابع مع المزارعين غير موجودة", f.PictureOfFollower != "", 5},
-		{"عدد المزارعين غير مطابق لاسمائهم", f.FarmersCount == len(f.FarmersNames), 3},
+		// {"عدد المزارعين غير مطابق لاسمائهم", f.FarmersCount == len(f.FarmersNames), 3},
 		{"لا يوجد محاصيل", len(f.CurrentCrops) != 0, 3},
 		{"معدل انتاج الكمبوست غير موجود", f.CompostProduction > 0, 3},
 		{"كمية الكمبوست غير موجودة", f.CompostQtys > 0, 3},

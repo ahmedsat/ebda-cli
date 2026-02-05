@@ -18,13 +18,14 @@ type subcommand interface {
 	Result() any
 }
 
-var subcommands map[string]subcommand
+var subcommands = map[string]subcommand{}
 
 func init() {
-	subcommands = make(map[string]subcommand)
 	subcommands["help"] = &HelpCommand{}
 	subcommands["follow-up"] = &commands.FollowUpCommand{}
 	subcommands["pgs"] = &commands.Pgs{}
+	subcommands["map"] = &commands.Map{}
+	subcommands["soil"] = &commands.Soil{}
 }
 
 func usage(executable string) {
