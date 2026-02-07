@@ -15,9 +15,14 @@ type Soil struct {
 	records []types.SoilAnalysis
 }
 
+// Description implements [main.subcommand].
+func (s *Soil) Description() string {
+	return "Get soil records"
+}
+
 // Name implements [main.subcommand].
 func (s *Soil) Name() string {
-	panic("unimplemented")
+	return "soil"
 }
 
 // Result implements [main.subcommand].

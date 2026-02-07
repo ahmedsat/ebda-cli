@@ -8,6 +8,11 @@ import (
 type HelpCommand struct {
 }
 
+// Description implements [subcommand].
+func (h *HelpCommand) Description() string {
+	return "Display help"
+}
+
 func (h *HelpCommand) Name() string { return "Help" }
 
 func (h *HelpCommand) Run(args []string) error {

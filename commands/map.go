@@ -15,9 +15,14 @@ type Map struct {
 	maps []types.MapRecord
 }
 
+// Description implements [main.subcommand].
+func (m *Map) Description() string {
+	return "Get map records"
+}
+
 // Name implements [main.subcommand].
 func (m *Map) Name() string {
-	panic("unimplemented")
+	return "map"
 }
 
 // Result implements [main.subcommand].

@@ -31,9 +31,14 @@ var userRegionMap = map[string]string{}
 type Missing struct {
 }
 
+// Description implements [main.subcommand].
+func (m *Missing) Description() string {
+	return "Migrating data from kobo to frappe"
+}
+
 // Name implements [main.subcommand].
 func (m *Missing) Name() string {
-	panic("unimplemented")
+	return "missing"
 }
 
 // Result implements [main.subcommand].

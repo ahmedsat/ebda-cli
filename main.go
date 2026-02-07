@@ -16,27 +16,39 @@ type subcommand interface {
 	Usage() string
 	Run([]string) error
 	Result() any
+	Description() string
 }
 
 var subcommands = map[string]subcommand{}
 
+func AddSubCommand(sb subcommand) {
+	subcommands[sb.Name()] = sb
+}
+
 func init() {
-	subcommands["help"] = &HelpCommand{}
-	subcommands["follow-up"] = &commands.FollowUpCommand{}
-	subcommands["pgs"] = &commands.Pgs{}
-	subcommands["map"] = &commands.Map{}
-	subcommands["soil"] = &commands.Soil{}
+	AddSubCommand(&HelpCommand{})
+	AddSubCommand(&commands.FollowUpCommand{})
+	AddSubCommand(&commands.Pgs{})
+	AddSubCommand(&commands.Map{})
+	AddSubCommand(&commands.Soil{})
 }
 
 func usage(executable string) {
 	fmt.Fprintf(os.Stderr, "Usage: %s subcommand [options]\n", executable)
 	fmt.Fprintln(os.Stderr, "subcommands:")
-	for subcommand := range subcommands {
-		fmt.Fprintf(os.Stderr, "  %s\n", subcommand)
+	for _, subcommand := range subcommands {
+
+		fmt.Fprintf(os.Stderr, "  %-10s : %s\n", subcommand.Name(), subcommand.Description())
 	}
 }
 
 func main() {
+
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "not subcommand provided")
+		usage(os.Args[0])
+		os.Exit(1)
+	}
 
 	err := config.Configure()
 	if err != nil {
@@ -50,12 +62,6 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stderr, "Logged result %+v\n", res)
-
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "not subcommand provided")
-		usage(os.Args[0])
-		os.Exit(1)
-	}
 
 	executable = os.Args[0]
 	subcommand := os.Args[1]

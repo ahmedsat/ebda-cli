@@ -14,9 +14,14 @@ type Pgs struct {
 	Submissions []kobo.PGSNew
 }
 
+// Description implements [main.subcommand].
+func (p *Pgs) Description() string {
+	return "Extract PGS data from kobo"
+}
+
 // Name implements [main.subcommand].
 func (p *Pgs) Name() string {
-	panic("unimplemented")
+	return "pgs"
 }
 
 // Result implements [main.subcommand].

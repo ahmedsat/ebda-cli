@@ -19,9 +19,14 @@ type FollowUpCommand struct {
 	results []types.FarmFollowUp
 }
 
+// Description implements [main.subcommand].
+func (f *FollowUpCommand) Description() string {
+	return "Calculating rates and printing results"
+}
+
 // Name implements [main.subcommand].
 func (f *FollowUpCommand) Name() string {
-	panic("unimplemented")
+	return "follow-up"
 }
 
 // Result implements [main.subcommand].
