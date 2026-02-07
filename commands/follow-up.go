@@ -14,6 +14,12 @@ import (
 	"github.com/ahmedsat/ebda-cli/utils"
 )
 
+/*
+#include "lualib.h"
+#include "lauxlib.h"
+*/
+import "C"
+
 type FollowUpCommand struct {
 	copy    bool
 	results []types.FarmFollowUp
@@ -98,46 +104,14 @@ func (f *FollowUpCommand) Usage() string {
 	panic("unimplemented")
 }
 
-func FollowUp(args []string) error {
-
-	results, err := frappe.Get[types.FarmFollowUp](nil, frappe.List{"name"})
-	if err != nil {
-		return err
+//export GoFollowUp
+func GoFollowUp() int32 {
+	f := &FollowUpCommand{}
+	if err := f.Run(nil); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 0
 	}
+	fmt.Println(f.Result())
 
-	fmt.Fprintln(os.Stderr, "Calculating rates...")
-	counter := 1
-	s := utils.NewSyncRunner(10, 0)
-	for i := range results {
-		s.Run(func() {
-			err := results[i].Rate()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			}
-			fmt.Fprintf(os.Stderr, "\r%d/%d (%.2f%%)", counter, len(results), float64(counter)/float64(len(results))*100)
-			counter++
-		})
-	}
-	s.Wait()
-	fmt.Fprintln(os.Stderr)
-
-	fmt.Fprintln(os.Stderr, "Sorting results...")
-	slices.SortFunc(results, func(f1, f2 types.FarmFollowUp) int {
-		return int(f2.RatePercent*100) - int(f1.RatePercent*100)
-	})
-
-	fmt.Fprintln(os.Stderr, "Printing results...")
-	for _, result := range results {
-		if !result.Rated {
-			continue
-		}
-		fmt.Println(strings.Join([]string{
-			result.Name,
-			result.FarmCode,
-			fmt.Sprintf("%f", result.RatePercent),
-			strings.Join(result.Issues, " - "),
-		}, "\t"))
-	}
-
-	return nil
+	return 0
 }

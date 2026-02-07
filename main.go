@@ -1,5 +1,8 @@
 package main
 
+//go:generate make -C lua-src
+//go:generate go run -v ./gen
+
 import (
 	"fmt"
 	"os"

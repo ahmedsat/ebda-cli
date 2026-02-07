@@ -23,7 +23,7 @@ SYSLIBS=
 MYCFLAGS=
 MYLDFLAGS=
 MYLIBS=
-MYOBJS= custom.o
+MYOBJS=
 
 # Special flags for compiler modules; -Os reduces code size.
 CMCFLAGS= 

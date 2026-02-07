@@ -1,14 +1,12 @@
 package cgo
 
-//go:generate make -C lua-src
-
 /*
 #cgo LDFLAGS: -L../lua-src -llua -lm
 #cgo CFLAGS: -I../lua-src
 #include <stdlib.h>
 #include "lualib.h"
 #include "lauxlib.h"
-#include "custom.h"
+#include "custom_cgo_helper.h"
 */
 import "C"
 import (
@@ -89,8 +87,7 @@ func (s *State) ToString(idx int) string {
 
 func (s *State) OpenLibs() {
 	s.OpenSelectedLibs(^0, 0)
-	s.PushCFunction(CFunction(C.go_caller))
-	s.SetGlobal("go_caller")
+	s.libs()
 }
 
 func (s *State) SetGlobal(name string) {
@@ -109,13 +106,4 @@ func (s *State) PushCClosure(fn CFunction, n int) {
 
 func (s *State) OpenSelectedLibs(load, preload int) {
 	C.luaL_openselectedlibs((*C.lua_State)(s), C.int(load), C.int(preload))
-}
-
-//export GoCall
-func GoCall(s *State) int32 {
-	fmt.Println("go_call")
-	fmt.Println(s.ToString(-1))
-	fmt.Println(s.ToString(0))
-	fmt.Println(s.ToString(1))
-	return 0
 }
