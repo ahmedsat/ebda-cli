@@ -20,13 +20,13 @@ type CollectAttachments struct {
 }
 
 type CollectFarmers struct {
-	IntegerTu0fc18 string `json:"farmers/integer_tu0fc18"`
-	Name           string `json:"farmers/name"`
-	Gender         string `json:"farmers/gender"`
-	IdFace         string `json:"farmers/id_face"`
-	IdBack         string `json:"farmers/id_back"`
-	IdNumber       string `json:"farmers/id_number"`
-	Phone          string `json:"farmers/phone"`
+	Number   string `json:"farmers/integer_tu0fc18"`
+	Name     string `json:"farmers/name"`
+	Gender   string `json:"farmers/gender"`
+	IdFace   string `json:"farmers/id_face"`
+	IdBack   string `json:"farmers/id_back"`
+	IdNumber string `json:"farmers/id_number"`
+	Phone    string `json:"farmers/phone"`
 }
 
 type CollectPoint struct {

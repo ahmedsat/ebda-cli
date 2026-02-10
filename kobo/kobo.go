@@ -3,6 +3,7 @@ package kobo
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -260,4 +261,16 @@ func GetUpdateURL[T KoboAsset](id int) (response GetUpdateURLResponse, err error
 
 	return
 
+}
+
+func Download(url string) (r io.ReadCloser, err error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return
+	}
+	resp, err := DoRequest(req)
+	if err != nil {
+		return
+	}
+	return resp.Body, nil
 }

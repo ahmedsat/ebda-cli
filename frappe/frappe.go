@@ -16,6 +16,7 @@ import (
 
 type FrappeDoctype interface {
 	DocTypeName() string
+	DocName() string
 }
 
 var client *http.Client
@@ -92,6 +93,12 @@ func GetEx[T FrappeDoctype](filters Filters, fields List, restricted bool) (resu
 }
 
 func Get1[T FrappeDoctype](id string) (result T, err error) {
+
+	if id == "" {
+		err = errors.New("id is required")
+		return
+	}
+
 	url, err := url.JoinPath(config.ErpBaseUrl, "/api/resource", result.DocTypeName(), id)
 	if err != nil {
 		return
@@ -113,10 +120,11 @@ func Get1[T FrappeDoctype](id string) (result T, err error) {
 		err = errors.Join(fmt.Errorf("http error: %d", resp.StatusCode), errors.New("failed to get response"))
 		return
 	}
+	// utils.SaveHttpResponse(*resp)
 
 	decoder := json.NewDecoder(resp.Body)
 
-	decoder.DisallowUnknownFields()
+	// decoder.DisallowUnknownFields()
 
 	var response = struct {
 		Data T `json:"data"`
@@ -171,6 +179,8 @@ func Delete[T FrappeDoctype](id string) (err error) {
 	return
 }
 
+var ErrDedicated = errors.New("dedicated")
+
 func Create[T FrappeDoctype](data T) (result T, err error) {
 
 	url, err := url.JoinPath(config.ErpBaseUrl, "/api/resource", data.DocTypeName())
@@ -201,7 +211,10 @@ func Create[T FrappeDoctype](data T) (result T, err error) {
 
 	if resp.StatusCode != 200 {
 		utils.SaveHttpResponse(*resp)
-		err = errors.Join(fmt.Errorf("http error: %d", resp.StatusCode), errors.New("failed to get response"))
+		err = fmt.Errorf("http error: %d", resp.StatusCode)
+		if resp.StatusCode == 409 {
+			err = ErrDedicated
+		}
 		return
 	}
 
@@ -219,6 +232,61 @@ func Create[T FrappeDoctype](data T) (result T, err error) {
 	}
 
 	result = response.Data
+
+	return
+}
+
+func UpdateDoc[T FrappeDoctype](doc T) (result T, err error) {
+
+	if doc.DocName() == "" {
+		err = errors.New("doc name is required")
+		return
+	}
+
+	url, err := url.JoinPath(config.ErpBaseUrl, "/api/resource", doc.DocTypeName(), doc.DocName())
+	if err != nil {
+		return
+	}
+	req, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		return
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+
+	jsonData, err := json.Marshal(doc)
+	if err != nil {
+		return
+	}
+
+	req.Body = io.NopCloser(bytes.NewReader(jsonData))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.SaveHttpResponse(*resp)
+		err = errors.Join(fmt.Errorf("http error: %d", resp.StatusCode), errors.New("failed to get response"))
+		return
+	}
+
+	data := struct {
+		Data T `json:"data"`
+	}{
+		Data: doc,
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&data)
+	if err != nil {
+		return
+	}
+
+	result = data.Data
 
 	return
 }

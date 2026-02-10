@@ -12,7 +12,7 @@ type Run struct{}
 
 // Description implements [main.subcommand].
 func (r *Run) Description() string {
-	panic("unimplemented")
+	return "Run lua script"
 }
 
 // Name implements [main.subcommand].

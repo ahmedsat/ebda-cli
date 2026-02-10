@@ -10,3 +10,4 @@ env.go
 
 logs/*
 dist/
+rejected.txt

@@ -6,6 +6,7 @@ type Coord struct {
 }
 
 type MapRecord struct {
+	Base
 	Name             string  `json:"name"`
 	ShapeID          string  `json:"shape_id"`
 	Type             string  `json:"type"`
