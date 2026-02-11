@@ -24,16 +24,21 @@ type subcommand interface {
 
 var subcommands = map[string]subcommand{}
 
-func AddSubCommand(sb subcommand) {
-	subcommands[sb.Name()] = sb
+func AddSubCommand(scs ...subcommand) {
+	for _, sc := range scs {
+		subcommands[sc.Name()] = sc
+	}
 }
 
 func init() {
-	AddSubCommand(&HelpCommand{})
-	AddSubCommand(&commands.FollowUpCommand{})
-	AddSubCommand(&commands.Pgs{})
-	AddSubCommand(&commands.Map{})
-	AddSubCommand(&commands.Soil{})
+	AddSubCommand(
+		&HelpCommand{},
+		&commands.FollowUpCommand{},
+		&commands.Pgs{},
+		&commands.Map{},
+		&commands.Soil{},
+		&commands.Info{},
+	)
 }
 
 func usage(executable string) {

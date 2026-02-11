@@ -88,20 +88,20 @@ type FileUploadResponse struct {
 	Creation              string `json:"creation"`
 	Modified              string `json:"modified"`
 	ModifiedBy            string `json:"modified_by"`
-	Docstatus             string `json:"docstatus"`
-	Idx                   string `json:"idx"`
+	Docstatus             int    `json:"docstatus"`
+	Idx                   int    `json:"idx"`
 	FileName              string `json:"file_name"`
-	IsPrivate             string `json:"is_private"`
+	IsPrivate             int    `json:"is_private"`
 	FileType              string `json:"file_type"`
-	IsHomeFolder          string `json:"is_home_folder"`
-	IsAttachmentsFolder   string `json:"is_attachments_folder"`
-	FileSize              string `json:"file_size"`
+	IsHomeFolder          int    `json:"is_home_folder"`
+	IsAttachmentsFolder   int    `json:"is_attachments_folder"`
+	FileSize              int    `json:"file_size"`
 	FileUrl               string `json:"file_url"`
 	Folder                string `json:"folder"`
-	IsFolder              string `json:"is_folder"`
+	IsFolder              int    `json:"is_folder"`
 	ContentHash           string `json:"content_hash"`
-	UploadedToDropbox     string `json:"uploaded_to_dropbox"`
-	UploadedToGoogleDrive string `json:"uploaded_to_google_drive"`
+	UploadedToDropbox     int    `json:"uploaded_to_dropbox"`
+	UploadedToGoogleDrive int    `json:"uploaded_to_google_drive"`
 	Doctype               string `json:"doctype"`
 }
 
@@ -109,7 +109,7 @@ func UploadFile(
 	data []byte,
 	fileName string,
 	onProgress func(sent, total int64),
-) (res FileUploadResponse, errs error) {
+) (res FileUploadResponse, err error) {
 
 	url_, err := url.JoinPath(config.ErpBaseUrl, "/api/method/upload_file")
 	if err != nil {
@@ -126,16 +126,16 @@ func UploadFile(
 		return
 	}
 
-	if _, err := part.Write(data); err != nil {
+	if _, err = part.Write(data); err != nil {
 		return
 	}
 
 	// Optional: explicit file name field (Frappe supports it)
-	if err := writer.WriteField("file_name", fileName); err != nil {
+	if err = writer.WriteField("file_name", fileName); err != nil {
 		return
 	}
 
-	if err := writer.Close(); err != nil {
+	if err = writer.Close(); err != nil {
 		return
 	}
 
@@ -168,14 +168,40 @@ func UploadFile(
 		return
 	}
 
+	// utils.SaveHttpResponse(*resp)
 	// Decode response
 	resStruct := struct {
 		Message FileUploadResponse `json:"message"`
 	}{}
-	if err := json.NewDecoder(resp.Body).Decode(&resStruct); err != nil {
+
+	dec := json.NewDecoder(resp.Body)
+	dec.DisallowUnknownFields()
+	err = dec.Decode(&resStruct)
+	if err != nil {
 		return
 	}
+
 	res = resStruct.Message
+
+	return
+}
+
+func TestUrl(url_ string) (resp *http.Response, err error) {
+
+	url, err := url.JoinPath(config.ErpBaseUrl, url_)
+	if err != nil {
+		return
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return
+	}
+	resp, err = client.Do(req)
+
+	if err != nil {
+		return
+	}
 
 	return
 }

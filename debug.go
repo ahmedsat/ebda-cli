@@ -5,6 +5,9 @@ package main
 import "github.com/ahmedsat/ebda-cli/commands"
 
 func init() {
-	AddSubCommand(&commands.Missing{})
-	AddSubCommand(&commands.Run{})
+	AddSubCommand(
+		&commands.Missing{},
+		&commands.Run{},
+		&commands.Debug{},
+	)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/ahmedsat/ebda-cli/frappe/types"
 	"github.com/ahmedsat/ebda-cli/kobo"
 	"github.com/ahmedsat/ebda-cli/utils"
+	"github.com/gen2brain/go-fitz"
 	"gorm.io/gorm"
 )
 
@@ -71,6 +72,7 @@ func (m *Missing) Run(args []string) error {
 
 	flagSet := flag.NewFlagSet("missing", flag.ExitOnError)
 	fix := flagSet.Bool("fix", false, "Fix not approved submissions")
+	noFarmers := flagSet.Bool("no-farmers", false, "Do not migrate farmers")
 	flagSet.Parse(args)
 
 	fmt.Fprintln(os.Stderr, "getting data from kobo...")
@@ -78,6 +80,11 @@ func (m *Missing) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// asset, err := kobo.GetAssetByID[kobo.Collect](647559988)
+	// data := []kobo.Collect{
+	// 	asset,
+	// }
 
 	if *fix {
 		fmt.Fprintln(os.Stderr, "fixing not approved submissions...")
@@ -137,9 +144,11 @@ func (m *Missing) Run(args []string) error {
 			return err
 		}
 
-		err = HandleFarmers(&d, &submissionState, file)
-		if err != nil {
-			return err
+		if !*noFarmers {
+			err = HandleFarmers(&d, &submissionState, file)
+			if err != nil {
+				return err
+			}
 		}
 
 		if submissionState.FarmersDone && submissionState.SoilDone && submissionState.BoundaryDone {
@@ -311,64 +320,100 @@ func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log 
 		farm.Farmers[num-1].NationalIdNumber = farmer.IdNumber
 
 		face := ""
+		facePdf := false
 		back := ""
+		backPdf := false
 		for _, att := range collect.Attachments {
 			if att.QuestionXpath == fmt.Sprintf("farmers[%d]/id_face", i+1) {
 				face = att.DownloadUrl
+				switch att.Mimetype {
+				case "application/pdf":
+					facePdf = true
+				case "image/jpeg", "image/png", "image/gif": // do nothing
+				default:
+					return fmt.Errorf("unknown mimetype: %s", att.Mimetype)
+				}
 			}
 			if att.QuestionXpath == fmt.Sprintf("farmers[%d]/id_back", i+1) {
 				back = att.DownloadUrl
+				switch att.Mimetype {
+				case "application/pdf":
+					backPdf = true
+				case "image/jpeg", "image/png", "image/gif": // do nothing
+				default:
+					return fmt.Errorf("unknown mimetype: %s", att.Mimetype)
+				}
 			}
 		}
+
+		var combinedImage image.Image
 
 		reader, err := kobo.Download(face)
-		faceImage, _, err := image.Decode(reader)
-		if err != nil {
-			if errors.Is(err, image.ErrFormat) {
-				fmt.Fprintf(log, "unsupported image format: %s\n", face)
-			}
-			return err
-		}
-		reader.Close()
-
-		var combinedImage = faceImage
-
-		if back != "" {
-
-			reader, err = kobo.Download(back)
+		if facePdf {
+			combinedImage, err = PdfToImage(reader)
 			if err != nil {
 				return err
 			}
-
-			backImage, _, err := image.Decode(reader)
+		} else {
+			faceImage, _, err := image.Decode(reader)
 			if err != nil {
 				if errors.Is(err, image.ErrFormat) {
-					fmt.Fprintf(log, "unsupported image format: %s\n", back)
+					fmt.Fprintf(log, "unsupported image format: %s\n", face)
 				}
 				return err
 			}
 			reader.Close()
-
-			combinedImage = StackVertical(faceImage, backImage)
+			combinedImage = faceImage
 		}
+
+		if back != "" {
+			reader, err = kobo.Download(back)
+			if err != nil {
+				return err
+			}
+			var backImage image.Image
+			if backPdf {
+				backImage, err = PdfToImage(reader)
+				if err != nil {
+					return err
+				}
+			} else {
+				backImage, _, err = image.Decode(reader)
+				if err != nil {
+					if errors.Is(err, image.ErrFormat) {
+						fmt.Fprintf(log, "unsupported image format: %s\n", back)
+					}
+					return err
+				}
+
+			}
+			reader.Close()
+
+			combinedImage = StackVertical(combinedImage, backImage)
+		}
+
 		buf := bytes.Buffer{}
 		err = png.Encode(&buf, combinedImage)
 		if err != nil {
 			return err
 		}
 
+		fmt.Fprintln(os.Stderr)
 		res, err := frappe.UploadFile(buf.Bytes(), fmt.Sprintf("face-%d-%d.jpg", collect.ID, num), func(sent, total int64) {
 			percent := float64(sent) / float64(total) * 100
-			fmt.Fprintf(os.Stderr, "\rUploading: %.1f%%", percent)
+			fmt.Fprintf(os.Stderr, "\r[%d/%d] Uploading: %.1f%%", i+1, len(collect.Farmers), percent)
 		})
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stderr)
+
+		if res.FileUrl == "" {
+			return fmt.Errorf("empty file url")
+		}
 
 		farm.Farmers[num-1].FarmerNationalIdImage = res.FileUrl
-
 	}
+	fmt.Fprintln(os.Stderr)
 
 	_, err = frappe.UpdateDoc(farm)
 	if err != nil {
@@ -391,7 +436,6 @@ func UpdateFarmerName(farm *types.Farm, num int64, newFarmer kobo.CollectFarmers
 		fmt.Fprintf(log, "%d - farmer name is to short %d: %s\n", id, num, newFarmer.Name)
 		kobo.UpdateValidationState[kobo.Collect](id, kobo.ValidationStatusNotApproved)
 		return fmt.Errorf("%d - farmer name is to short %d: %s\n", id, num, newFarmer.Name)
-
 	}
 
 	for _, farmer := range farm.Farmers {
@@ -476,6 +520,19 @@ func UpdateFarmerName(farm *types.Farm, num int64, newFarmer kobo.CollectFarmers
 }
 
 func StackVertical(img1, img2 image.Image) image.Image {
+
+	if img1 == nil && img2 == nil {
+		return nil
+	}
+
+	if img1 == nil {
+		return img2
+	}
+
+	if img2 == nil {
+		return img1
+	}
+
 	w1, h1 := img1.Bounds().Dx(), img1.Bounds().Dy()
 	w2, h2 := img2.Bounds().Dx(), img2.Bounds().Dy()
 
@@ -500,4 +557,23 @@ func StackVertical(img1, img2 image.Image) image.Image {
 	)
 
 	return dst
+}
+
+func PdfToImage(reader io.Reader) (result image.Image, err error) {
+	doc, err := fitz.NewFromReader(reader)
+	if err != nil {
+		return
+	}
+	defer doc.Close()
+
+	for i := range doc.NumPage() {
+		var img *image.RGBA
+		img, err = doc.Image(i)
+		if err != nil {
+			return
+		}
+		result = StackVertical(result, img)
+	}
+
+	return
 }
