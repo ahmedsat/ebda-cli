@@ -40,6 +40,14 @@ func (f *FollowUpCommand) Result() any {
 
 	fmt.Fprintf(os.Stderr, "Printing results[%d]...\n", len(f.results))
 	var res strings.Builder
+	fmt.Fprintln(&res, strings.Join([]string{
+		"ID",
+		"Farm Code",
+		"Rate",
+		"Issues",
+		"Visit Date",
+		"Email",
+	}, "\t"))
 	for _, result := range f.results {
 		if !result.Rated {
 			continue
@@ -49,6 +57,8 @@ func (f *FollowUpCommand) Result() any {
 			result.FarmCode,
 			fmt.Sprintf("%f", result.RatePercent),
 			strings.Join(result.Issues, " - "),
+			result.VisitDate,
+			result.Owner,
 		}, "\t"))
 	}
 

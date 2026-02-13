@@ -179,7 +179,7 @@ func Delete[T FrappeDoctype](id string) (err error) {
 	return
 }
 
-var ErrDedicated = errors.New("dedicated")
+var ErrDuplicated = errors.New("duplicated")
 
 func Create[T FrappeDoctype](data T) (result T, err error) {
 
@@ -213,7 +213,7 @@ func Create[T FrappeDoctype](data T) (result T, err error) {
 		utils.SaveHttpResponse(*resp)
 		err = fmt.Errorf("http error: %d", resp.StatusCode)
 		if resp.StatusCode == 409 {
-			err = ErrDedicated
+			err = ErrDuplicated
 		}
 		return
 	}

@@ -27,6 +27,7 @@ const (
 
 	UpdateValidationStatePath = "/api/v2/assets/%s/data/%d/validation_status/" // (string,int)
 	GetEditPath               = "/api/v2/assets/%s/data/%d/enketo/edit/"       // (string,int)
+	ValidationStatusKey       = "_validation_status.uid"
 )
 
 func DoRequest(req *http.Request) (resp *http.Response, err error) {
@@ -61,16 +62,16 @@ type AssetsResponse[T KoboAsset] struct {
 	Results  []T    `json:"results"`
 }
 
-func GetAssets[T KoboAsset]() (result []T, err error) {
+func GetAssets[T KoboAsset](query Query) (result []T, err error) {
 	start := 0
-	res, err := GetAssetsExt[T](0, start)
+	res, err := GetAssetsExt[T](query, 0, start)
 	if err != nil {
 		return
 	}
 	result = res.Results
 	for res.Next != "" {
 		start += 0
-		res, err = GetAssetsExt[T](0, start)
+		res, err = GetAssetsExt[T](query, 0, start)
 		if err != nil {
 			return
 		}
@@ -114,7 +115,7 @@ func GetAssetByID[T KoboAsset](id int) (result T, err error) {
 	return
 }
 
-func GetAssetsExt[T KoboAsset](limit int, start int) (result AssetsResponse[T], err error) {
+func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResponse[T], err error) {
 	var t T
 	url, err := url.Parse(config.KoboBaseURL)
 	if err != nil {
@@ -131,6 +132,7 @@ func GetAssetsExt[T KoboAsset](limit int, start int) (result AssetsResponse[T], 
 		query.Set("start", fmt.Sprint(start))
 	}
 
+	query.Set("query", q.String())
 	url.RawQuery = query.Encode()
 
 	req, err := http.NewRequest("GET", url.String(), nil)
@@ -144,12 +146,14 @@ func GetAssetsExt[T KoboAsset](limit int, start int) (result AssetsResponse[T], 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
+		utils.SaveHttpResponse(*resp)
 		err = fmt.Errorf("http error: %d", resp.StatusCode)
 		return
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 
+	// utils.SaveHttpResponse(*resp)
 	// decoder.DisallowUnknownFields()
 
 	err = decoder.Decode(&result)

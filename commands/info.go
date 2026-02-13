@@ -48,6 +48,7 @@ func (i *Info) Run(args []string) (err error) {
 		case 1:
 			farm := farms[0]
 			fmt.Fprintf(&i.sb, "Farm: %s\n", farm.ArabicName)
+			fmt.Fprintf(&i.sb, "Owner: %s\n", farm.FarmOwner)
 			fmt.Fprintf(&i.sb, "Region: %s\n", farm.Region)
 			fmt.Fprintf(&i.sb, "Total farmers: %d\n", farm.TotalFarmers)
 			fmt.Fprintf(&i.sb, "Area: %.2f\n", farm.Area)

@@ -5,8 +5,9 @@ type ValidationStatus struct {
 }
 
 type PGSNew struct {
-	FormID           string `json:"at_house/farm_id"`
-	EngName          string `json:"at_house/__011"`
+	ID               int    `json:"_id"`
+	FarmCode         string `json:"at_house/farm_id"`
+	EngName          string `json:"engineer_data/engineer_name"`
 	VisitDate        string `json:"at_house/visit_date"`
 	ValidationStatus `json:"_validation_status"`
 }

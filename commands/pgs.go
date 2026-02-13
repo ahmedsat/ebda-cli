@@ -27,8 +27,19 @@ func (p *Pgs) Name() string {
 // Result implements [main.subcommand].
 func (p *Pgs) Result() any {
 	sb := strings.Builder{}
+	fmt.Fprintln(&sb, strings.Join([]string{
+		"Code",
+		"Visit Date",
+		"Eng Name",
+		"Label",
+	}, "\t"))
 	for _, s := range p.Submissions {
-		fmt.Fprintf(&sb, "%s\t%s\t%s\t%s\n", s.FormID, s.VisitDate, s.EngName, s.Label)
+		fmt.Fprintln(&sb, strings.Join([]string{
+			s.FarmCode,
+			s.VisitDate,
+			s.EngName,
+			s.Label,
+		}, "\t"))
 	}
 
 	if p.copy {
@@ -46,7 +57,7 @@ func (p *Pgs) Run(args []string) (err error) {
 	fs.Parse(args)
 	p.copy = *copy
 
-	p.Submissions, err = kobo.GetAssets[kobo.PGSNew]()
+	p.Submissions, err = kobo.GetAssets[kobo.PGSNew](nil)
 	return
 }
 

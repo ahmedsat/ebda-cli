@@ -2,12 +2,12 @@
 test.sh
  
 *.json
-*.tsv
 *.csv
 *.kml
 
 env.go
 
 logs/*
+plans/*
 dist/
 rejected.txt

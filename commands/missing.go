@@ -26,6 +26,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var runner *utils.SyncRunner
+
 type SubmissionState struct {
 	gorm.Model
 	FarmersDone  bool
@@ -35,6 +37,7 @@ type SubmissionState struct {
 
 func init() {
 	config.MigrationsList = append(config.MigrationsList, &SubmissionState{})
+	runner = utils.NewSyncRunner(10, 0)
 }
 
 var userRegionMap = map[string]string{}
@@ -71,98 +74,130 @@ func (m *Missing) Run(args []string) error {
 	}
 
 	flagSet := flag.NewFlagSet("missing", flag.ExitOnError)
-	fix := flagSet.Bool("fix", false, "Fix not approved submissions")
 	noFarmers := flagSet.Bool("no-farmers", false, "Do not migrate farmers")
 	flagSet.Parse(args)
+	args = flagSet.Args()
 
 	fmt.Fprintln(os.Stderr, "getting data from kobo...")
-	data, err := kobo.GetAssets[kobo.Collect]()
+
+	var data []kobo.Collect
+
+	if len(args) > 0 {
+		for _, arg := range args {
+			id, err := strconv.Atoi(arg)
+			if err != nil {
+				return err
+			}
+			asset, err := kobo.GetAssetByID[kobo.Collect](id)
+			if err != nil {
+				return err
+			}
+			data = append(data, asset)
+		}
+	} else {
+		query := kobo.Query{
+			kobo.ValidationStatusKey: nil,
+		}
+
+		data, err = kobo.GetAssets[kobo.Collect](query)
+		if err != nil {
+			return err
+		}
+	}
+
+	var Error error
+	n, err := utils.NewProgressNotification(
+		"Handling Submissions",
+		fmt.Sprintf("Handled [%d:%d]", 0, len(data)),
+		"kobo-collect-handling-submissions",
+		0,
+	)
 	if err != nil {
-		return err
+		panic(err)
 	}
+	n.Run()
 
-	// asset, err := kobo.GetAssetByID[kobo.Collect](647559988)
-	// data := []kobo.Collect{
-	// 	asset,
-	// }
+	counter := 1
+	for _, d := range data {
+		runner.Run(func() {
 
-	if *fix {
-		fmt.Fprintln(os.Stderr, "fixing not approved submissions...")
-		for _, d := range data {
-			if d.CollectValidationSate.Label == "Not Approved" {
-				fmt.Println(d.ID)
-				fmt.Println(d.Code)
-				res, err := kobo.GetUpdateURL[kobo.Collect](d.ID)
+			var submissionState SubmissionState
+			defer func() {
+				config.DB.Save(&submissionState)
+				n, err := utils.NewProgressNotification(
+					"Handling Submissions",
+					fmt.Sprintf("Handled [%d:%d]", counter, len(data)),
+					"kobo-collect-handling-submissions",
+					int(float64(counter)/float64(len(data))*100),
+				)
 				if err != nil {
-					return err
+					panic(err)
 				}
+				n.Run()
+				counter++
+			}()
 
-				fmt.Printf("%+v", res)
-				// todo: ask for confirmation if confirmed update validation states
-				fmt.Scanln()
+			if d.CollectValidationSate.Label == "Approved" || d.CollectValidationSate.Label == "Not Approved" {
+				return
 			}
-		}
-		return nil
+
+			err = config.DB.First(&submissionState, d.ID).Error
+			if err != nil && err != gorm.ErrRecordNotFound {
+				Error = errors.Join(Error, err)
+				return
+			}
+
+			if err == gorm.ErrRecordNotFound {
+				submissionState.ID = uint(d.ID)
+				err = config.DB.Create(&submissionState).Error
+				if err != nil {
+					Error = errors.Join(Error, err)
+					return
+				}
+			}
+
+			if d.Farm == "" {
+				fmt.Fprintf(file, "submission %d has no farm\n", d.ID)
+				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusNotApproved)
+				if err != nil {
+					Error = errors.Join(Error, err)
+					return
+				}
+				return
+			}
+
+			err = HandleSoil(&d, &submissionState)
+			if err != nil {
+				Error = errors.Join(Error, err)
+				return
+			}
+
+			err = HandleBoundary(&d, &submissionState)
+			if err != nil {
+				Error = errors.Join(Error, err)
+				return
+			}
+
+			if !*noFarmers {
+				err = HandleFarmers(&d, &submissionState, file)
+				if err != nil {
+					Error = errors.Join(Error, err)
+					return
+				}
+			}
+
+			if submissionState.FarmersDone && submissionState.SoilDone && submissionState.BoundaryDone {
+				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusApproved)
+				if err != nil {
+					Error = errors.Join(Error, err)
+					return
+				}
+			}
+
+		})
 	}
-
-	for i, d := range data {
-		fmt.Fprintf(os.Stderr, "\rProgress {%d} [%d:%d] (%.2f%%)", d.ID, i+1, len(data), float64(i+1)/float64(len(data))*100)
-
-		if d.CollectValidationSate.Label == "Approved" || d.CollectValidationSate.Label == "Not Approved" {
-			continue
-		}
-		var submissionState SubmissionState
-		err = config.DB.First(&submissionState, d.ID).Error
-		if err != nil && err != gorm.ErrRecordNotFound {
-			return err
-		}
-
-		if err == gorm.ErrRecordNotFound {
-			submissionState.ID = uint(d.ID)
-			err = config.DB.Create(&submissionState).Error
-			if err != nil {
-				return err
-			}
-		}
-
-		if d.Farm == "" {
-			fmt.Fprintf(file, "submission %d has no farm\n", d.ID)
-			_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusNotApproved)
-			if err != nil {
-				return err
-			}
-			continue
-		}
-
-		err = HandleSoil(&d, &submissionState)
-		if err != nil {
-			return err
-		}
-
-		err = HandleBoundary(&d, &submissionState)
-		if err != nil {
-			return err
-		}
-
-		if !*noFarmers {
-			err = HandleFarmers(&d, &submissionState, file)
-			if err != nil {
-				return err
-			}
-		}
-
-		if submissionState.FarmersDone && submissionState.SoilDone && submissionState.BoundaryDone {
-			_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusApproved)
-			if err != nil {
-				return err
-			}
-		}
-
-		config.DB.Save(&submissionState)
-	}
-	fmt.Fprintln(os.Stderr, "")
-
-	return nil
+	runner.Wait()
+	return Error
 }
 
 func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) error {
@@ -398,10 +433,18 @@ func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log 
 			return err
 		}
 
-		fmt.Fprintln(os.Stderr)
-		res, err := frappe.UploadFile(buf.Bytes(), fmt.Sprintf("face-%d-%d.jpg", collect.ID, num), func(sent, total int64) {
-			percent := float64(sent) / float64(total) * 100
-			fmt.Fprintf(os.Stderr, "\r[%d/%d] Uploading: %.1f%%", i+1, len(collect.Farmers), percent)
+		res, err := frappe.UploadFile(buf.Bytes(), fmt.Sprintf("face-%d-%d.png", collect.ID, num), func(sent, total int64) {
+
+			n, err := utils.NewProgressNotification(
+				"Uploading",
+				fmt.Sprintf("%d - [%d/%d]", collect.ID, i+1, len(collect.Farmers)),
+				fmt.Sprintf("uploading-to-erp-face-%d-%d.png", collect.ID, num),
+				int(float64(sent)/float64(total)*100),
+			)
+			if err != nil {
+				panic(err)
+			}
+			n.Run()
 		})
 		if err != nil {
 			return err
@@ -413,7 +456,6 @@ func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log 
 
 		farm.Farmers[num-1].FarmerNationalIdImage = res.FileUrl
 	}
-	fmt.Fprintln(os.Stderr)
 
 	_, err = frappe.UpdateDoc(farm)
 	if err != nil {
@@ -447,9 +489,9 @@ func UpdateFarmerName(farm *types.Farm, num int64, newFarmer kobo.CollectFarmers
 	}
 
 	new := types.Farmer{
-		FarmerName: newFarmer.Name,
-		Phone:      newFarmer.Phone,
-		Gender:     newFarmer.Gender,
+		FarmerName: strings.TrimSpace(newFarmer.Name),
+		Phone:      strings.TrimSpace(newFarmer.Phone),
+		Gender:     strings.TrimSpace(newFarmer.Gender),
 	}
 
 	_, err := frappe.Create(new)

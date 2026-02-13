@@ -14,7 +14,7 @@ type Debug struct{}
 
 // Description implements [main.subcommand].
 func (d *Debug) Description() string {
-	panic("unimplemented")
+	return "Debug commands"
 }
 
 // Name implements [main.subcommand].
@@ -80,7 +80,7 @@ func (d *Debug) UpdateFarmerName(args []string) error {
 	}
 
 	_, err = frappe.Create(new)
-	if err != nil && !errors.Is(err, frappe.ErrDedicated) {
+	if err != nil && !errors.Is(err, frappe.ErrDuplicated) {
 		return err
 	}
 

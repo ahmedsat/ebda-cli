@@ -38,6 +38,7 @@ func init() {
 		&commands.Map{},
 		&commands.Soil{},
 		&commands.Info{},
+		&commands.Farm{},
 	)
 }
 

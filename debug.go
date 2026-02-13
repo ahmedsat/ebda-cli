@@ -9,5 +9,6 @@ func init() {
 		&commands.Missing{},
 		&commands.Run{},
 		&commands.Debug{},
+		&commands.VisitsPlan{},
 	)
 }
