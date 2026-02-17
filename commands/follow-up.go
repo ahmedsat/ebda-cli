@@ -14,12 +14,6 @@ import (
 	"github.com/ahmedsat/ebda-cli/utils"
 )
 
-/*
-#include "lualib.h"
-#include "lauxlib.h"
-*/
-import "C"
-
 type FollowUpCommand struct {
 	copy    bool
 	results []types.FarmFollowUp
@@ -71,7 +65,7 @@ func (f *FollowUpCommand) Result() any {
 }
 
 // Run implements [main.subcommand].
-func (f *FollowUpCommand) Run(args []string) error {
+func (f *FollowUpCommand) Run(args []string) (any, error) {
 
 	fs := flag.NewFlagSet("follow-up", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
@@ -81,24 +75,28 @@ func (f *FollowUpCommand) Run(args []string) error {
 
 	results, err := frappe.Get[types.FarmFollowUp](nil, frappe.List{"name"})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	fmt.Fprintln(os.Stderr, "Calculating rates...")
 	counter := 1
 	s := utils.NewSyncRunner(10, 0)
 	for i := range results {
-		s.Run(func() {
-			err := results[i].Rate()
+		s.Run(func() (err error) {
+			err = results[i].Rate()
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				return
 			}
 			fmt.Fprintf(os.Stderr, "\r%d/%d (%.2f%%)", counter, len(results), float64(counter)/float64(len(results))*100)
 			counter++
+			return
 		})
 	}
-	s.Wait()
+	err = s.Wait()
 	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return nil, err
+	}
 
 	fmt.Fprintln(os.Stderr, "Sorting results...")
 	slices.SortFunc(results, func(f1, f2 types.FarmFollowUp) int {
@@ -106,22 +104,10 @@ func (f *FollowUpCommand) Run(args []string) error {
 	})
 
 	f.results = results
-	return nil
+	return f.Result(), nil
 }
 
 // Usage implements [main.subcommand].
 func (f *FollowUpCommand) Usage() string {
 	panic("unimplemented")
-}
-
-//export GoFollowUp
-func GoFollowUp() int32 {
-	f := &FollowUpCommand{}
-	if err := f.Run(nil); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 0
-	}
-	fmt.Println(f.Result())
-
-	return 0
 }

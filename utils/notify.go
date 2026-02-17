@@ -2,8 +2,13 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"time"
+
+	"github.com/ahmedsat/ebda-cli/config"
 )
 
 /*
@@ -72,6 +77,11 @@ type Notification struct {
 }
 
 func (n *Notification) Run() (stdout, stderr string, err error) {
+
+	if config.DisableNotify {
+		return
+	}
+
 	name := "notify-send"
 	args := []string{}
 
@@ -158,8 +168,11 @@ func (n *Notification) Run() (stdout, stderr string, err error) {
 }
 
 func NewProgressNotification(summary string, body string, id string, progress int) (*Notification, error) {
+
+	fmt.Fprintf(os.Stderr, "\r%s = > (%d%%)", body, progress)
+
 	if progress < 0 || progress > 100 {
-		return nil, fmt.Errorf("progress must be between 0 and 100")
+		return nil, fmt.Errorf("progress must be between 0 and 100 inclusive got %d", progress)
 	}
 
 	if id == "" {
@@ -176,8 +189,8 @@ func NewProgressNotification(summary string, body string, id string, progress in
 	}
 
 	return &Notification{
-		Summary:    summary,
-		Body:       body,
+		Summary:    fmt.Sprintf("%q", summary),
+		Body:       fmt.Sprintf("%q", body),
 		Urgency:    UrgencyLow,
 		ExpireTime: timeout,
 		Hints: []Hint{
@@ -196,7 +209,11 @@ func NewProgressNotification(summary string, body string, id string, progress in
 }
 
 func runCmd(name string, args []string) (stdout, stderr string, err error) {
-	cmd := exec.Command(name, args...)
+
+	ctx, canceled := context.WithTimeout(context.Background(), time.Microsecond)
+	defer canceled()
+
+	cmd := exec.CommandContext(ctx, name, args...)
 	outBytes := []byte{}
 	bufStdout := bytes.NewBuffer(outBytes)
 	errBytes := []byte{}

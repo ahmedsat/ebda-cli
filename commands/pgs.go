@@ -51,13 +51,14 @@ func (p *Pgs) Result() any {
 }
 
 // Run implements [main.subcommand].
-func (p *Pgs) Run(args []string) (err error) {
+func (p *Pgs) Run(args []string) (r any, err error) {
 	fs := flag.NewFlagSet("pgs", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	fs.Parse(args)
 	p.copy = *copy
 
 	p.Submissions, err = kobo.GetAssets[kobo.PGSNew](nil)
+	r = p.Result()
 	return
 }
 

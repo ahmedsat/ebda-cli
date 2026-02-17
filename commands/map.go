@@ -43,7 +43,7 @@ func (m *Map) Result() any {
 }
 
 // Run implements [main.subcommand].
-func (m *Map) Run(args []string) (err error) {
+func (m *Map) Run(args []string) (r any, err error) {
 
 	fs := flag.NewFlagSet("map", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
@@ -52,8 +52,10 @@ func (m *Map) Run(args []string) (err error) {
 
 	m.maps, err = frappe.Get[types.MapRecord](nil, frappe.List{"farm", "jsoncode"})
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	r = m.Result()
 
 	return
 }

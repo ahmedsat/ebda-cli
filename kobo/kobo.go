@@ -116,6 +116,12 @@ func GetAssetByID[T KoboAsset](id int) (result T, err error) {
 }
 
 func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResponse[T], err error) {
+
+	// https://community.kobotoolbox.org/t/important-changes-to-api-v2-assets-uid-asset-data-result-limits/74610
+	if limit > 1000 {
+		limit = 1000
+	}
+
 	var t T
 	url, err := url.Parse(config.KoboBaseURL)
 	if err != nil {
@@ -132,8 +138,10 @@ func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResp
 		query.Set("start", fmt.Sprint(start))
 	}
 
-	query.Set("query", q.String())
-	url.RawQuery = query.Encode()
+	if len(q) != 0 {
+		query.Set("query", q.String())
+		url.RawQuery = query.Encode()
+	}
 
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
@@ -146,7 +154,6 @@ func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResp
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		utils.SaveHttpResponse(*resp)
 		err = fmt.Errorf("http error: %d", resp.StatusCode)
 		return
 	}

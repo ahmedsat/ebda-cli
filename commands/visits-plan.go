@@ -1,3 +1,5 @@
+//go:build !release
+
 package commands
 
 import (
@@ -137,6 +139,11 @@ type VisitsPlan struct {
 	sb strings.Builder
 }
 
+// Result implements [main.subcommand].
+func (v *VisitsPlan) Result() any {
+	panic("unimplemented")
+}
+
 // Description implements [main.subcommand].
 func (v *VisitsPlan) Description() string {
 	return "Visits plan"
@@ -147,28 +154,23 @@ func (v *VisitsPlan) Name() string {
 	return "visits-plan"
 }
 
-// Result implements [main.subcommand].
-func (v *VisitsPlan) Result() any {
-	return v.sb.String()
-}
-
 // Run implements [main.subcommand].
-func (v *VisitsPlan) Run(args []string) error {
+func (v *VisitsPlan) Run(args []string) (any, error) {
 	if len(args) < 1 {
-		return nil
+		return nil, fmt.Errorf("not enough arguments")
 	}
 	subcommand := args[0]
 
 	switch subcommand {
 	case "new":
 		if len(args) < 2 {
-			return fmt.Errorf("not enough arguments")
+			return nil, fmt.Errorf("not enough arguments")
 		}
-		return v.New(args[1:])
+		return nil, v.New(args[1:])
 	case "export":
-		return v.Export()
+		return nil, v.Export()
 	default:
-		return fmt.Errorf("unavailable commands: %s", subcommand)
+		return nil, fmt.Errorf("unavailable commands: %s", subcommand)
 	}
 }
 

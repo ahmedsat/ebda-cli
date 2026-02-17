@@ -28,10 +28,10 @@ func (i *Info) Result() any {
 }
 
 // Run implements [main.subcommand].
-func (i *Info) Run(args []string) (err error) {
+func (i *Info) Run(args []string) (r any, err error) {
 
 	if len(args) < 1 {
-		return
+		return nil, fmt.Errorf("no code provided")
 	}
 
 	if strings.HasPrefix(args[0], "EG/") {
@@ -40,7 +40,7 @@ func (i *Info) Run(args []string) (err error) {
 		var farms []types.Farm
 		farms, err = frappe.Get[types.Farm](frappe.Filters{frappe.NewFilter("farm_id", frappe.Eq, code)}, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		switch len(farms) {
 		case 0:
@@ -62,7 +62,10 @@ func (i *Info) Run(args []string) (err error) {
 	if len(args) != 0 {
 		i.Run(args)
 	}
-	return nil
+
+	r = i.Result()
+
+	return
 }
 
 // Usage implements [main.subcommand].

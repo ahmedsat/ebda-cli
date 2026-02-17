@@ -1,3 +1,5 @@
+//go:build !release
+
 package cgo
 
 /*
@@ -8,6 +10,6 @@ package cgo
 import "C"
 
 func (s *State) libs() {
-	s.PushCFunction(CFunction(C.GoFollowUp))
-	s.SetGlobal("FollowUp")
+	// s.PushCFunction(CFunction(C.GoFollowUp))
+	// s.SetGlobal("FollowUp")
 }

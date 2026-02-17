@@ -1,3 +1,5 @@
+//go:build !release
+
 package commands
 
 import (
@@ -10,6 +12,11 @@ import (
 
 type Run struct{}
 
+// Result implements [main.subcommand].
+func (r *Run) Result() any {
+	panic("unimplemented")
+}
+
 // Description implements [main.subcommand].
 func (r *Run) Description() string {
 	return "Run lua script"
@@ -20,16 +27,11 @@ func (r *Run) Name() string {
 	return "run"
 }
 
-// Result implements [main.subcommand].
-func (r *Run) Result() any {
-	panic("unimplemented")
-}
-
 // Run implements [main.subcommand].
-func (r *Run) Run(args []string) error {
+func (r *Run) Run(args []string) (any, error) {
 
 	if len(args) < 1 {
-		return errors.New("No enough arguments")
+		return errors.New("No enough arguments"), nil
 	}
 
 	lua, err := cgo.NewLuaState()
@@ -49,7 +51,7 @@ func (r *Run) Run(args []string) error {
 
 	os.Exit(0)
 
-	return nil
+	return nil, nil
 }
 
 // Usage implements [main.subcommand].

@@ -43,7 +43,7 @@ func (s *Soil) Result() any {
 }
 
 // Run implements [main.subcommand].
-func (s *Soil) Run(args []string) (err error) {
+func (s *Soil) Run(args []string) (r any, err error) {
 	fs := flag.NewFlagSet("soil", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	fs.Parse(args)
@@ -51,8 +51,10 @@ func (s *Soil) Run(args []string) (err error) {
 
 	s.records, err = frappe.Get[types.SoilAnalysis](nil, frappe.List{"farm", "location"})
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	r = s.Result()
 
 	return
 }

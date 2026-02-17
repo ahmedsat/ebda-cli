@@ -16,12 +16,27 @@ const (
 	Gte FilterComparator = ">="
 	Lte FilterComparator = "<="
 	Neq FilterComparator = "!="
+	In  FilterComparator = "in"
 )
 
 type Filter struct {
 	Field    string
 	Operator FilterComparator
 	Value    string
+}
+
+func FiltersValueList(vals ...string) string {
+	sb := strings.Builder{}
+	sb.WriteString("[")
+	for _, val := range vals {
+		sb.WriteString("\"" + val + "\"")
+		sb.WriteString(",")
+	}
+	temp := sb.String()[:len(sb.String())-1]
+	sb.Reset()
+	sb.WriteString(temp)
+	sb.WriteString("]")
+	return sb.String()
 }
 
 func NewFilter(field string, operator FilterComparator, value string) Filter {
@@ -33,6 +48,9 @@ func NewFilter(field string, operator FilterComparator, value string) Filter {
 }
 
 func (f Filter) String() string {
+	if f.Operator == In {
+		return fmt.Sprintf("[\"%s\",\"%s\",%s]", f.Field, f.Operator, f.Value)
+	}
 	return fmt.Sprintf("[\"%s\",\"%s\",\"%s\"]", f.Field, f.Operator, f.Value)
 }
 

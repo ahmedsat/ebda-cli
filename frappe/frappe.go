@@ -120,10 +120,8 @@ func Get1[T FrappeDoctype](id string) (result T, err error) {
 		err = errors.Join(fmt.Errorf("http error: %d", resp.StatusCode), errors.New("failed to get response"))
 		return
 	}
-	// utils.SaveHttpResponse(*resp)
 
 	decoder := json.NewDecoder(resp.Body)
-
 	// decoder.DisallowUnknownFields()
 
 	var response = struct {

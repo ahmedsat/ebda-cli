@@ -3,10 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 var (
@@ -16,8 +12,8 @@ var (
 	KoboAuthToken  string
 	KoboBaseURL    string
 	DBFilePath     string
-	DB             *gorm.DB
 	MigrationsList []any
+	DisableNotify  bool
 )
 
 func Configure() (err error) {
@@ -49,20 +45,15 @@ func Configure() (err error) {
 		return fmt.Errorf("DB_EBDA_CLI_FILE_PATH is not set")
 	}
 
-	if DBFilePath != "" {
+	disableNotify, ok := os.LookupEnv("DISABLE_NOTIFY")
+	if !ok {
+		return fmt.Errorf("DISABLE_NOTIFY is not set")
+	}
+	DisableNotify = disableNotify == "true"
 
-		fmt.Fprintln(os.Stderr, DBFilePath)
-		DB, err = gorm.Open(sqlite.Open(DBFilePath), &gorm.Config{})
-		if err != nil {
-			return
-		}
-
-		// disable logging
-		DB.Logger = logger.Discard
-		err = DB.AutoMigrate(MigrationsList...)
-		if err != nil {
-			return
-		}
+	err = initDB()
+	if err != nil {
+		return
 	}
 
 	return nil

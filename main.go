@@ -15,11 +15,10 @@ import (
 var executable string
 
 type subcommand interface {
-	Name() string
-	Usage() string
-	Run([]string) error
-	Result() any
-	Description() string
+	Name() (name string)
+	Usage() (usage string)
+	Run(args []string) (result any, err error)
+	Description() (desc string)
 }
 
 var subcommands = map[string]subcommand{}
@@ -31,6 +30,7 @@ func AddSubCommand(scs ...subcommand) {
 }
 
 func init() {
+	fmt.Println("init")
 	AddSubCommand(
 		&HelpCommand{},
 		&commands.FollowUpCommand{},
@@ -82,15 +82,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = sbc.Run(os.Args[2:])
+	result, err := sbc.Run(os.Args[2:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%+v\n", err)
 		os.Exit(1)
 	}
 
-	result := sbc.Result()
-	if result != nil {
-		fmt.Printf("%+v\n", result)
-	}
-
+	fmt.Printf("%+v\n", result)
 }

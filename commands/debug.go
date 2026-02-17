@@ -12,6 +12,11 @@ import (
 
 type Debug struct{}
 
+// Result implements [main.subcommand].
+func (d *Debug) Result() any {
+	panic("unimplemented")
+}
+
 // Description implements [main.subcommand].
 func (d *Debug) Description() string {
 	return "Debug commands"
@@ -22,27 +27,22 @@ func (d *Debug) Name() string {
 	return "debug"
 }
 
-// Result implements [main.subcommand].
-func (d *Debug) Result() any {
-	return nil
-}
-
 // Run implements [main.subcommand].
-func (d *Debug) Run(args []string) error {
+func (d *Debug) Run(args []string) (any, error) {
 	if len(args) < 1 {
-		return fmt.Errorf("not enough arguments")
+		return nil, fmt.Errorf("not enough arguments")
 	}
 	debugCommand := args[0]
 	switch args[0] {
 	case "test":
-		return d.Test(args[1:])
+		return d.Test(args[1:]), nil
 	case "update-farmer-name":
-		return d.UpdateFarmerName(args[1:])
+		return d.UpdateFarmerName(args[1:]), nil
 	default:
 		fmt.Fprintf(os.Stderr, "unavailable commands: %s\n", debugCommand)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (d *Debug) UpdateFarmerName(args []string) error {

@@ -1,3 +1,5 @@
+//go:build !release
+
 package commands
 
 import (
@@ -60,17 +62,12 @@ func (m *Missing) Name() string {
 	return "missing"
 }
 
-// Result implements [main.subcommand].
-func (m *Missing) Result() any {
-	return nil
-}
-
 // Run implements [main.subcommand].
-func (m *Missing) Run(args []string) error {
+func (m *Missing) Run(args []string) (result any, err error) {
 
 	file, err := os.OpenFile("rejected.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		return err
+		return
 	}
 
 	flagSet := flag.NewFlagSet("missing", flag.ExitOnError)
@@ -79,18 +76,16 @@ func (m *Missing) Run(args []string) error {
 	args = flagSet.Args()
 
 	fmt.Fprintln(os.Stderr, "getting data from kobo...")
-
 	var data []kobo.Collect
-
 	if len(args) > 0 {
 		for _, arg := range args {
 			id, err := strconv.Atoi(arg)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			asset, err := kobo.GetAssetByID[kobo.Collect](id)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			data = append(data, asset)
 		}
@@ -101,11 +96,10 @@ func (m *Missing) Run(args []string) error {
 
 		data, err = kobo.GetAssets[kobo.Collect](query)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
-	var Error error
 	n, err := utils.NewProgressNotification(
 		"Handling Submissions",
 		fmt.Sprintf("Handled [%d:%d]", 0, len(data)),
@@ -119,7 +113,7 @@ func (m *Missing) Run(args []string) error {
 
 	counter := 1
 	for _, d := range data {
-		runner.Run(func() {
+		runner.Run(func() (err error) {
 
 			var submissionState SubmissionState
 			defer func() {
@@ -143,7 +137,6 @@ func (m *Missing) Run(args []string) error {
 
 			err = config.DB.First(&submissionState, d.ID).Error
 			if err != nil && err != gorm.ErrRecordNotFound {
-				Error = errors.Join(Error, err)
 				return
 			}
 
@@ -151,7 +144,6 @@ func (m *Missing) Run(args []string) error {
 				submissionState.ID = uint(d.ID)
 				err = config.DB.Create(&submissionState).Error
 				if err != nil {
-					Error = errors.Join(Error, err)
 					return
 				}
 			}
@@ -160,7 +152,6 @@ func (m *Missing) Run(args []string) error {
 				fmt.Fprintf(file, "submission %d has no farm\n", d.ID)
 				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusNotApproved)
 				if err != nil {
-					Error = errors.Join(Error, err)
 					return
 				}
 				return
@@ -168,20 +159,17 @@ func (m *Missing) Run(args []string) error {
 
 			err = HandleSoil(&d, &submissionState)
 			if err != nil {
-				Error = errors.Join(Error, err)
 				return
 			}
 
 			err = HandleBoundary(&d, &submissionState)
 			if err != nil {
-				Error = errors.Join(Error, err)
 				return
 			}
 
 			if !*noFarmers {
 				err = HandleFarmers(&d, &submissionState, file)
 				if err != nil {
-					Error = errors.Join(Error, err)
 					return
 				}
 			}
@@ -189,15 +177,17 @@ func (m *Missing) Run(args []string) error {
 			if submissionState.FarmersDone && submissionState.SoilDone && submissionState.BoundaryDone {
 				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusApproved)
 				if err != nil {
-					Error = errors.Join(Error, err)
 					return
 				}
 			}
 
+			return
 		})
 	}
-	runner.Wait()
-	return Error
+
+	err = runner.Wait()
+
+	return
 }
 
 func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) error {
