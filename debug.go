@@ -7,7 +7,6 @@ import "github.com/ahmedsat/ebda-cli/commands"
 func init() {
 	AddSubCommand(
 		&commands.Missing{},
-		&commands.Run{},
 		&commands.Debug{},
 		&commands.VisitsPlan{},
 	)
