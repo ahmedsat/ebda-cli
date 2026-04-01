@@ -49,7 +49,7 @@ func (s *Soil) Run(args []string) (r any, err error) {
 	fs.Parse(args)
 	s.copy = *copy
 
-	s.records, err = frappe.Get[types.SoilAnalysis](nil, frappe.List{"farm", "location"})
+	s.records, err = frappe.Get[types.SoilAnalysis](nil, frappe.List{"farm", "location"}, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,10 @@ type FrappeDoctype interface {
 
 var client *http.Client
 
+func Do(req *http.Request) (*http.Response, error) {
+	return client.Do(req)
+}
+
 func init() {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -31,11 +35,11 @@ func init() {
 	}
 }
 
-func Get[T FrappeDoctype](filters Filters, fields List) (result []T, err error) {
-	return GetEx[T](filters, fields, false)
+func Get[T FrappeDoctype](filters Filters, fields, expand List) (result []T, err error) {
+	return GetEx[T](filters, fields, expand, false)
 }
 
-func GetEx[T FrappeDoctype](filters Filters, fields List, restricted bool) (result []T, err error) {
+func GetEx[T FrappeDoctype](filters Filters, fields, expand List, restricted bool) (result []T, err error) {
 	var t T
 	url, err := url.JoinPath(config.ErpBaseUrl, "/api/resource", t.DocTypeName())
 	if err != nil {
@@ -58,6 +62,10 @@ func GetEx[T FrappeDoctype](filters Filters, fields List, restricted bool) (resu
 		fields = List{"*"}
 	}
 	q.Add("fields", fields.String())
+
+	if len(expand) != 0 {
+		q.Add("expand", expand.String())
+	}
 
 	req.URL.RawQuery = q.Encode()
 

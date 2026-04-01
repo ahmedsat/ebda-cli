@@ -13,17 +13,35 @@ type FarmFarmer struct {
 	Phone                 string  `json:"phone"`
 }
 
+type FarmWorker struct {
+	BaseInnerTable
+	Count  int    `json:"worker"`
+	Gender string `json:"gender"`
+	Age    string `json:"age"`
+}
+
 type Farm struct {
 	Base
-	Farmers         []FarmFarmer `json:"farmers"`
-	FarmId          string       `json:"farm_id"`
-	ArabicName      string       `json:"arabic_name"`
-	Region          string       `json:"region"`
-	TotalFarmers    int          `json:"total_farmers"`
-	FarmOwner       string       `json:"farm_owner"`
-	Area            float64      `json:"farm_area__feddan"`
-	CreationDate    string       `json:"creation_date"`
-	FarmApplication string       `json:"farm_application"`
+	Name__              string       `json:"docname"`
+	Farmers             []FarmFarmer `json:"farmers"`
+	FarmId              string       `json:"farm_id"`
+	ArabicName          string       `json:"arabic_name"`
+	Region              string       `json:"region"`
+	TotalFarmers        int          `json:"total_farmers"`
+	FarmOwner           string       `json:"farm_owner"`
+	Area                float64      `json:"farm_area__feddan"`
+	CreationDate        string       `json:"creation_date"`
+	FarmApplication     string       `json:"farm_application"`
+	Type                string       `json:"type"`
+	IsPlotOfSector      byte         `json:"is_plot_of_sector"`
+	UpscalingProject    string       `json:"upscaling_project"`
+	Subupscalingproject string       `json:"subupscalingproject"`
+	ParentFarm          string       `json:"parent_farm"`
+	Category            string       `json:"gategory"`
+	LeadingEngineers    byte         `json:"leading_engineers"`
+	FarmName            string       `json:"farm_name"`
+	IsInternalFarm      byte         `json:"is_internal_farm"`
+	Workers             []FarmWorker `json:"workers"`
 }
 
 func (f Farm) DocTypeName() string {

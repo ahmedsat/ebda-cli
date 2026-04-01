@@ -3,6 +3,7 @@ package commands
 import (
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ahmedsat/ebda-cli/kobo"
@@ -57,6 +58,7 @@ func (p *Pgs) Run(args []string) (r any, err error) {
 	fs.Parse(args)
 	p.copy = *copy
 
+	fmt.Fprintln(os.Stderr, "getting data")
 	p.Submissions, err = kobo.GetAssets[kobo.PGSNew](nil)
 	r = p.Result()
 	return

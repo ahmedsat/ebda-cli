@@ -18,6 +18,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ahmedsat/ebda-cli/config"
 	"github.com/ahmedsat/ebda-cli/frappe"
@@ -117,6 +118,10 @@ func (m *Missing) Run(args []string) (result any, err error) {
 
 			var submissionState SubmissionState
 			defer func() {
+				if err != nil {
+					fmt.Printf("%d\t%s\t%s\n", d.ID, d.Farm, err)
+					err = nil
+				}
 				config.DB.Save(&submissionState)
 				n, err := utils.NewProgressNotification(
 					"Handling Submissions",
@@ -167,11 +172,9 @@ func (m *Missing) Run(args []string) (result any, err error) {
 				return
 			}
 
-			if !*noFarmers {
-				err = HandleFarmers(&d, &submissionState, file)
-				if err != nil {
-					return
-				}
+			err = HandleFarmers(&d, &submissionState, file, *noFarmers)
+			if err != nil {
+				return
 			}
 
 			if submissionState.FarmersDone && submissionState.SoilDone && submissionState.BoundaryDone {
@@ -186,6 +189,8 @@ func (m *Missing) Run(args []string) (result any, err error) {
 	}
 
 	err = runner.Wait()
+
+	time.Sleep(time.Second * 10)
 
 	return
 }
@@ -207,8 +212,8 @@ func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) err
 	pointsStr := strings.Split(area, ";")
 
 	type point struct {
-		Lat string `json:"lat"`
-		Lng string `json:"lng"`
+		Lat float64 `json:"lat"`
+		Lng float64 `json:"lng"`
 	}
 
 	var points []point
@@ -218,9 +223,19 @@ func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) err
 		if len(parts) != 4 {
 			return fmt.Errorf("invalid point: %s", p)
 		}
+
+		lat, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			return err
+		}
+		lng, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return err
+		}
+
 		var p = point{
-			Lat: parts[0],
-			Lng: parts[1],
+			Lat: lat,
+			Lng: lng,
 		}
 		points = append(points, p)
 	}
@@ -232,13 +247,13 @@ func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) err
 
 	pointsJson = pointsJson[1 : len(pointsJson)-1]
 
-	maps, err := frappe.Get[types.MapRecord](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, collect.Farm)}, nil)
+	maps, err := frappe.Get[types.MapRecord](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, collect.Farm)}, nil, nil)
 	if err != nil {
 		return err
 	}
 
 	for _, m := range maps {
-		if m.Color != "#181818" {
+		if m.Color != "#181818" && m.Color != "" {
 			continue
 		}
 
@@ -251,6 +266,7 @@ func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) err
 	m := types.MapRecord{
 		Farm:     collect.Farm,
 		Jsoncode: string(pointsJson),
+		Color:    "#181818",
 	}
 	_, err = frappe.Create(m)
 	if err != nil {
@@ -305,7 +321,7 @@ func HandleSoil(collect *kobo.Collect, submissionState *SubmissionState) error {
 	return nil
 }
 
-func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log io.Writer) error {
+func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log io.Writer, no_farmer bool) error {
 
 	if submissionState.FarmersDone {
 		return nil
@@ -313,6 +329,10 @@ func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log 
 
 	if len(collect.Farmers) == 0 {
 		submissionState.FarmersDone = true
+		return nil
+	}
+
+	if no_farmer {
 		return nil
 	}
 
@@ -491,7 +511,7 @@ func UpdateFarmerName(farm *types.Farm, num int64, newFarmer kobo.CollectFarmers
 		return err
 	}
 
-	trainings, err := frappe.Get[types.EbdaTraining](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, farm.Name)}, []string{"name", "farm"})
+	trainings, err := frappe.Get[types.EbdaTraining](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, farm.Name)}, []string{"name", "farm"}, nil)
 	if err != nil {
 		return err
 	}
@@ -513,7 +533,7 @@ func UpdateFarmerName(farm *types.Farm, num int64, newFarmer kobo.CollectFarmers
 		}
 	}
 
-	followUps, err := frappe.Get[types.FarmFollowUp](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, farm.Name)}, frappe.List{"name", "farm"})
+	followUps, err := frappe.Get[types.FarmFollowUp](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, farm.Name)}, frappe.List{"name", "farm"}, nil)
 	if err != nil {
 		return err
 	}

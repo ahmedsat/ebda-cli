@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ahmedsat/ebda-cli/commands"
+	"github.com/ahmedsat/ebda-cli/commands/training"
 	"github.com/ahmedsat/ebda-cli/config"
 	"github.com/ahmedsat/ebda-cli/frappe"
 )
@@ -27,7 +28,6 @@ func AddSubCommand(scs ...subcommand) {
 }
 
 func init() {
-	fmt.Println("init")
 	AddSubCommand(
 		&HelpCommand{},
 		&commands.FollowUpCommand{},
@@ -36,6 +36,7 @@ func init() {
 		&commands.Soil{},
 		&commands.Info{},
 		&commands.Farm{},
+		&training.Training{},
 	)
 }
 

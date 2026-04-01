@@ -12,6 +12,10 @@ github.com/jupiterrider/ffi v0.5.0 h1:j2nSgpabbV1JOwgP4Kn449sJUHq3cVLAZVBoOYn44V
 github.com/jupiterrider/ffi v0.5.0/go.mod h1:x7xdNKo8h0AmLuXfswDUBxUsd2OqUP4ekC8sCnsmbvo=
 github.com/mattn/go-sqlite3 v1.14.22 h1:2gZY6PC6kBnID23Tichd1K+Z0oS6nE/XwU+Vz/5o4kU=
 github.com/mattn/go-sqlite3 v1.14.22/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
+github.com/paulsmith/gogeos v0.1.2 h1:PASLPRO7sjXZLERnQ98EKqY4l9zjQW+irDD5FFRms8I=
+github.com/paulsmith/gogeos v0.1.2/go.mod h1:7GN4vaVO09zFKjDPYsAoeA1j+8GuSicOlnbKo+A0AZM=
+github.com/pebbe/go-proj-4 v5.0.0+incompatible h1:Xp30wed+UXAu4a34osjr6j19lcBIGuLcDMfJ+P41L1c=
+github.com/pebbe/go-proj-4 v5.0.0+incompatible/go.mod h1:hZx0uKWrmCNuR12ePikPWk9ZyzD3T5gnO9zAvGMmaUo=
 golang.org/x/sys v0.41.0 h1:Ivj+2Cp/ylzLiEU89QhWblYnOE9zerudt9Ftecq2C6k=
 golang.org/x/sys v0.41.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 golang.org/x/text v0.20.0 h1:gK/Kv2otX8gz+wn7Rmb3vT96ZwuoxnQlY+HlJVj7Qug=

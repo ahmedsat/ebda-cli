@@ -50,9 +50,10 @@ func (f *Farm) Result() any {
 // Run implements [main.subcommand].
 func (f *Farm) Run(args []string) (result any, err error) {
 
-	runner := utils.NewSyncRunner(100, 0)
+	runner := utils.NewSyncRunner(10, 100)
 
 	firstDay := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.Local)
+	lastDay := time.Now()
 
 	fs := flag.NewFlagSet("farms", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
@@ -60,9 +61,20 @@ func (f *Farm) Run(args []string) (result any, err error) {
 	followUp := fs.Bool("follow-up", false, "Follow up")
 	farmers := fs.Bool("farmers", false, "Farmers")
 	start := fs.String("start", firstDay.Format("2-1-2006"), "Start date")
+	end := fs.String("end", lastDay.Format("2-1-2006"), "End date")
 	fs.Parse(args)
-
 	args = fs.Args()
+
+	firstDay, err = time.Parse("2-1-2006", *start)
+	if err != nil {
+		return
+	}
+
+	lastDay, err = time.Parse("2-1-2006", *end)
+	if err != nil {
+		return
+	}
+
 	filters := frappe.Filters{
 		frappe.NewFilter("type", frappe.Eq, "Farm"),
 		frappe.NewFilter("farm_status", frappe.Neq, "Cancelled"),
@@ -76,7 +88,7 @@ func (f *Farm) Run(args []string) (result any, err error) {
 	farms, err := frappe.Get[types.Farm](filters, frappe.List{
 		"farm_id",
 		"name",
-	})
+	}, nil)
 
 	var out utils.SyncIoWriter
 	out.Writer = os.Stdout
@@ -99,16 +111,12 @@ func (f *Farm) Run(args []string) (result any, err error) {
 
 	var followUps []types.FarmFollowUp
 	if *followUp {
-		var d time.Time
-		d, err = time.Parse("2-1-2006", *start)
-		if err != nil {
-			return
-		}
 		fmt.Fprintln(os.Stderr, "getting follow-up data from frappe...")
 		fmt.Fprint(&out, "\tcount of visits\trate of visits")
 		followUps, err = frappe.Get[types.FarmFollowUp](frappe.Filters{
-			frappe.NewFilter("visit_date", frappe.Gte, d.Format("2006-01-02")),
-		}, frappe.List{"name", "farm", "farm_code"})
+			frappe.NewFilter("visit_date", frappe.Gte, firstDay.Format("2006-01-02")),
+			frappe.NewFilter("visit_date", frappe.Lte, lastDay.Format("2006-01-02")),
+		}, frappe.List{"name", "farm", "farm_code"}, nil)
 		if err != nil {
 			return
 		}
@@ -121,6 +129,7 @@ func (f *Farm) Run(args []string) (result any, err error) {
 		pgsSubmissions, err = kobo.GetAssets[kobo.PGSNew](kobo.Query{
 			"at_house/visit_date": kobo.Query{
 				"$gte": firstDay.Format("2006-01-02"),
+				"$lte": lastDay.Format("2006-01-02"),
 			},
 		})
 		if err != nil {
@@ -131,7 +140,8 @@ func (f *Farm) Run(args []string) (result any, err error) {
 
 	fmt.Fprintln(os.Stderr, "start evaluating farms")
 
-	for i, farm := range farms {
+	count := 1
+	for _, farm := range farms {
 		runner.Run(func() (err error) {
 			if _, ok := farmsMap[farm.FarmId]; !ok {
 				return
@@ -141,10 +151,11 @@ func (f *Farm) Run(args []string) (result any, err error) {
 				fmt.Fprintln(&out, sb.String())
 				n, _ := utils.NewProgressNotification(
 					"Farms Report",
-					fmt.Sprintf("Getting Data from frappe [%d:%d]", i+1, len(farms)),
-					"farms-report", int((i+1)*100/len(farms)),
+					fmt.Sprintf("Getting Data from frappe [%d:%d]", count, len(farms)),
+					"farms-report", count*100/len(farms),
 				)
 				n.Run()
+				count++
 			}()
 
 			fmt.Fprintf(&sb, "%s\t%s", farm.FarmId, strings.Join(farmsMap[farm.FarmId], "\t"))

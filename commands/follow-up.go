@@ -73,7 +73,7 @@ func (f *FollowUpCommand) Run(args []string) (any, error) {
 
 	f.copy = *copy
 
-	results, err := frappe.Get[types.FarmFollowUp](nil, frappe.List{"name"})
+	results, err := frappe.Get[types.FarmFollowUp](nil, frappe.List{"name"}, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -38,7 +38,7 @@ func (i *Info) Run(args []string) (r any, err error) {
 		code := args[0]
 		args = args[1:]
 		var farms []types.Farm
-		farms, err = frappe.Get[types.Farm](frappe.Filters{frappe.NewFilter("farm_id", frappe.Eq, code)}, nil)
+		farms, err = frappe.Get[types.Farm](frappe.Filters{frappe.NewFilter("farm_id", frappe.Eq, code)}, nil, nil)
 		if err != nil {
 			return nil, err
 		}

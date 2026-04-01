@@ -70,7 +70,7 @@ func GetAssets[T KoboAsset](query Query) (result []T, err error) {
 	}
 	result = res.Results
 	for res.Next != "" {
-		start += 0
+		start += len(res.Results)
 		res, err = GetAssetsExt[T](query, 0, start)
 		if err != nil {
 			return
@@ -130,6 +130,9 @@ func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResp
 	url = url.JoinPath(AssetsPath, t.GetFormID(), "data")
 
 	query := url.Query()
+
+	query.Set("format", "json")
+
 	if limit != 0 {
 		query.Set("limit", fmt.Sprint(limit))
 	}
@@ -142,6 +145,8 @@ func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResp
 		query.Set("query", q.String())
 		url.RawQuery = query.Encode()
 	}
+
+	url.RawQuery = query.Encode()
 
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
