@@ -26,15 +26,15 @@ func (d *Debug) Name() string {
 }
 
 // Run implements [main.subcommand].
-func (d *Debug) Run(args []string) (any, error) {
+func (d *Debug) Run(args []string) error {
 	if len(args) < 1 {
-		return nil, fmt.Errorf("not enough arguments")
+		return fmt.Errorf("not enough arguments")
 	}
 	debugCommand := args[0]
 	switch args[0] {
 	case "kobo-v":
 		if len(args) < 2 {
-			return nil, fmt.Errorf("not enough arguments")
+			return fmt.Errorf("not enough arguments")
 		}
 		return KoboVersion(args[1])
 
@@ -42,19 +42,19 @@ func (d *Debug) Run(args []string) (any, error) {
 		fmt.Fprintf(os.Stderr, "unavailable commands: %s\n", debugCommand)
 	}
 
-	return nil, nil
+	return nil
 }
 
-func KoboVersion(form_id string) (string, error) {
+func KoboVersion(form_id string) error {
 	// /api/v2/assets/{uid_asset}/versions/
 	resp, err := kobo.Get("/api/v2/assets/" + form_id + "/versions/")
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	utils.SaveHttpResponse(*resp)
 
-	return "", nil
+	return nil
 }
 
 // Usage implements [main.subcommand].

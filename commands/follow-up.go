@@ -15,8 +15,6 @@ import (
 )
 
 type FollowUpCommand struct {
-	copy    bool
-	results []types.FarmFollowUp
 }
 
 // Description implements [main.subcommand].
@@ -29,53 +27,16 @@ func (f *FollowUpCommand) Name() string {
 	return "follow-up"
 }
 
-// Result implements [main.subcommand].
-func (f *FollowUpCommand) Result() any {
-
-	fmt.Fprintf(os.Stderr, "Printing results[%d]...\n", len(f.results))
-	var res strings.Builder
-	fmt.Fprintln(&res, strings.Join([]string{
-		"ID",
-		"Farm Code",
-		"Rate",
-		"Issues",
-		"Visit Date",
-		"Email",
-	}, "\t"))
-	for _, result := range f.results {
-		if !result.Rated {
-			continue
-		}
-		fmt.Fprintln(&res, strings.Join([]string{
-			result.Name,
-			result.FarmCode,
-			fmt.Sprintf("%f", result.RatePercent),
-			strings.Join(result.Issues, " - "),
-			result.VisitDate,
-			result.Owner,
-		}, "\t"))
-	}
-
-	if f.copy {
-		clipboard.WriteAll(res.String())
-		return "copied to clipboard"
-	}
-
-	return res.String()
-}
-
 // Run implements [main.subcommand].
-func (f *FollowUpCommand) Run(args []string) (any, error) {
+func (f *FollowUpCommand) Run(args []string) error {
 
 	fs := flag.NewFlagSet("follow-up", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	fs.Parse(args)
 
-	f.copy = *copy
-
 	results, err := frappe.Get[types.FarmFollowUp](nil, frappe.List{"name"}, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	fmt.Fprintln(os.Stderr, "Calculating rates...")
@@ -95,7 +56,7 @@ func (f *FollowUpCommand) Run(args []string) (any, error) {
 	err = s.Wait()
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	fmt.Fprintln(os.Stderr, "Sorting results...")
@@ -103,8 +64,39 @@ func (f *FollowUpCommand) Run(args []string) (any, error) {
 		return int(f2.RatePercent*100) - int(f1.RatePercent*100)
 	})
 
-	f.results = results
-	return f.Result(), nil
+	fmt.Fprintf(os.Stderr, "Printing results[%d]...\n", len(results))
+	var res strings.Builder
+	fmt.Fprintln(&res, strings.Join([]string{
+		"ID",
+		"Farm Code",
+		"Rate",
+		"Issues",
+		"Visit Date",
+		"Email",
+	}, "\t"))
+	for _, result := range results {
+		if !result.Rated {
+			continue
+		}
+		fmt.Fprintln(&res, strings.Join([]string{
+			result.Name,
+			result.FarmCode,
+			fmt.Sprintf("%f", result.RatePercent),
+			strings.Join(result.Issues, " - "),
+			result.VisitDate,
+			result.Owner,
+		}, "\t"))
+	}
+
+	if *copy {
+		clipboard.WriteAll(res.String())
+		fmt.Println("copied to clipboard")
+		return nil
+	}
+
+	fmt.Print(res.String())
+	return nil
+
 }
 
 // Usage implements [main.subcommand].

@@ -31,7 +31,6 @@ func init() {
 }
 
 type VisitsPlan struct {
-	sb strings.Builder
 }
 
 // Result implements [main.subcommand].
@@ -64,14 +63,14 @@ func FormatName(s string) string {
 }
 
 // Run implements [main.subcommand].
-func (v *VisitsPlan) Run(args []string) (any, error) {
+func (v *VisitsPlan) Run(args []string) error {
 	if len(args) < 1 {
-		return nil, fmt.Errorf("not enough arguments")
+		return fmt.Errorf("not enough arguments")
 	}
 
 	plansDir := args[0]
 
-	v.sb.WriteString("date\tengName\tregion\tcountOfVisits\tcountOfPGSAudits\n")
+	fmt.Printf("date\tengName\tregion\tcountOfVisits\tcountOfPGSAudits\n")
 
 	err := filepath.WalkDir(plansDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -158,7 +157,7 @@ func (v *VisitsPlan) Run(args []string) (any, error) {
 					continue
 				}
 
-				fmt.Fprintf(&v.sb, "%s\t%s\t%s\t%s\t%s\n", date, engineer, region, countOfVisits, countOfPGSAudits)
+				fmt.Printf("%s\t%s\t%s\t%s\t%s\n", date, engineer, region, countOfVisits, countOfPGSAudits)
 				lastDate = date
 			}
 		}
@@ -167,10 +166,10 @@ func (v *VisitsPlan) Run(args []string) (any, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return v.sb.String(), nil
+	return nil
 }
 
 // Usage implements [main.subcommand].

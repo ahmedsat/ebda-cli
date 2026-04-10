@@ -34,7 +34,7 @@ type Farm struct{}
 
 // Description implements [main.subcommand].
 func (f *Farm) Description() string {
-	return "information about farms"
+	return "information about farms (experimental)"
 }
 
 // Name implements [main.subcommand].
@@ -48,7 +48,7 @@ func (f *Farm) Result() any {
 }
 
 // Run implements [main.subcommand].
-func (f *Farm) Run(args []string) (result any, err error) {
+func (f *Farm) Run(args []string) (err error) {
 
 	runner := utils.NewSyncRunner(10, 100)
 
@@ -230,7 +230,7 @@ func (f *Farm) Run(args []string) (result any, err error) {
 		})
 	}
 
-	return nil, runner.Wait()
+	return runner.Wait()
 }
 
 // Usage implements [main.subcommand].

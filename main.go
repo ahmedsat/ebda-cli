@@ -16,7 +16,7 @@ var executable string
 type subcommand interface {
 	Name() (name string)
 	Usage() (usage string)
-	Run(args []string) (result any, err error)
+	Run(args []string) (err error)
 	Description() (desc string)
 }
 
@@ -31,6 +31,7 @@ func AddSubCommand(scs ...subcommand) {
 func init() {
 	AddSubCommand(
 		&HelpCommand{},
+		&commands.Totals{},
 		&commands.FollowUpCommand{},
 		&commands.Pgs{},
 		&commands.Map{},
@@ -82,11 +83,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	result, err := sbc.Run(os.Args[2:])
+	err = sbc.Run(os.Args[2:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%+v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("%+v\n", result)
 }

@@ -14,7 +14,6 @@ import (
 )
 
 type Map struct {
-	maps []types.MapRecord
 }
 
 // Description implements [main.subcommand].
@@ -28,16 +27,18 @@ func (m *Map) Name() string {
 }
 
 // Run implements [main.subcommand].
-func (ma *Map) Run(args []string) (r any, err error) {
+func (ma *Map) Run(args []string) (err error) {
 
 	fs := flag.NewFlagSet("map", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	fs.Parse(args)
 
+	maps := []types.MapRecord{}
+
 	fmt.Fprintln(os.Stderr, "getting data")
-	ma.maps, err = frappe.Get[types.MapRecord](nil, nil, nil)
+	maps, err = frappe.Get[types.MapRecord](nil, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	fmt.Fprintln(os.Stderr, "done")
 
@@ -53,10 +54,10 @@ func (ma *Map) Run(args []string) (r any, err error) {
 	}
 
 	sbOut.WriteString("Farm\tname\tarea\n")
-	total := len(ma.maps)
+	total := len(maps)
 	i := 1
 	runner := utils.NewSyncRunner(100, 0)
-	for _, m := range ma.maps {
+	for _, m := range maps {
 		runner.Run(func() (e error) {
 
 			defer func() {
@@ -82,10 +83,10 @@ func (ma *Map) Run(args []string) (r any, err error) {
 
 	if *copy {
 		clipboard.WriteAll(sbOut.String())
-		r = "copied to clipboard"
+		fmt.Println("copied to clipboard")
 		return
 	} else {
-		r = sbOut.String()
+		fmt.Print(sbOut.String())
 	}
 
 	fmt.Fprintln(os.Stderr, sbErr.String())

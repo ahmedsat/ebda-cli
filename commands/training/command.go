@@ -27,14 +27,13 @@ type TrainingEntry struct {
 var TMap = map[string]TrainingEntry{}
 var mu = sync.Mutex{}
 
-func Print(data map[string]TrainingEntry) (sb strings.Builder) {
+func Print(data map[string]TrainingEntry) {
 
-	sb.WriteString("Farmer\tRegions\tFarms\tCodes\tModule\tCount\n")
+	fmt.Println("Farmer\tRegions\tFarms\tCodes\tModule\tCount")
 
 	for k, v := range data {
 		for m, c := range v.Modules {
-			fmt.Fprintf(
-				&sb,
+			fmt.Printf(
 				"%s\t%s\t%s\t%s\t%s\t%d\n",
 				k,
 				strings.Join(v.Regions, ","),
@@ -46,7 +45,6 @@ func Print(data map[string]TrainingEntry) (sb strings.Builder) {
 		}
 	}
 
-	return
 }
 
 func SaveToFile(filename string) error {
@@ -83,22 +81,22 @@ func (t *Training) Description() (desc string) {
 func (t *Training) Name() (name string) { return "training" }
 
 // Run implements [main.subcommand].
-func (t *Training) Run(args []string) (result any, err error) {
+func (t *Training) Run(args []string) (err error) {
 
 	if len(args) == 0 {
-		return nil, errors.New("missing subcommand")
+		return errors.New("missing subcommand")
 	}
 
 	switch args[0] {
 	case "get-data":
 		if len(args) > 1 {
-			return "", getData(args[1])
+			return getData(args[1])
 		}
-		return "", getData("training.json")
+		return getData("training.json")
 	case "filter":
 
 		if len(args) < 2 {
-			return "", errors.New("training file not set")
+			return errors.New("training file not set")
 		}
 
 		err = LoadFromFile(args[1])
@@ -115,14 +113,14 @@ func (t *Training) Run(args []string) (result any, err error) {
 
 		filtered, err := filter(opts)
 		if err != nil {
-			return "", err
+			return err
 		}
 
-		sb := Print(filtered)
-		return sb.String(), nil
+		Print(filtered)
+		return nil
 
 	default:
-		return "", errors.New("unavailable commands: " + args[0])
+		return errors.New("unavailable commands: " + args[0])
 	}
 
 }

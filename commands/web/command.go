@@ -13,14 +13,14 @@ type WebUi struct {
 
 // Description implements [main.subcommand].
 func (w *WebUi) Description() (desc string) {
-	panic("unimplemented")
+	return "experimental web ui"
 }
 
 // Name implements [main.subcommand].
 func (w *WebUi) Name() (name string) { return "web" }
 
 // Run implements [main.subcommand].
-func (w *WebUi) Run(args []string) (result any, err error) {
+func (w *WebUi) Run(args []string) (err error) {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -36,7 +36,7 @@ func (w *WebUi) Run(args []string) (result any, err error) {
 
 	http.ListenAndServe(":3000", r)
 
-	return nil, nil
+	return nil
 }
 
 // Usage implements [main.subcommand].

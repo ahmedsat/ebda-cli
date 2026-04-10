@@ -11,8 +11,6 @@ import (
 )
 
 type Pgs struct {
-	copy        bool
-	Submissions []kobo.PGSNew
 }
 
 // Description implements [main.subcommand].
@@ -25,8 +23,14 @@ func (p *Pgs) Name() string {
 	return "pgs"
 }
 
-// Result implements [main.subcommand].
-func (p *Pgs) Result() any {
+// Run implements [main.subcommand].
+func (p *Pgs) Run(args []string) (err error) {
+	fs := flag.NewFlagSet("pgs", flag.ExitOnError)
+	copy := fs.Bool("copy", false, "Copy to clipboard")
+	fs.Parse(args)
+
+	fmt.Fprintln(os.Stderr, "getting data")
+	Submissions, err := kobo.GetAssets[kobo.PGSNew](nil)
 	sb := strings.Builder{}
 	fmt.Fprintln(&sb, strings.Join([]string{
 		"Code",
@@ -34,7 +38,7 @@ func (p *Pgs) Result() any {
 		"Eng Name",
 		"Label",
 	}, "\t"))
-	for _, s := range p.Submissions {
+	for _, s := range Submissions {
 		fmt.Fprintln(&sb, strings.Join([]string{
 			s.AtHouseFarmId,
 			s.AtHouseVisitDate,
@@ -43,24 +47,13 @@ func (p *Pgs) Result() any {
 		}, "\t"))
 	}
 
-	if p.copy {
+	if *copy {
 		clipboard.WriteAll(sb.String())
-		return "copied to clipboard"
+		fmt.Println("copied to clipboard")
+		return
 	}
 
-	return sb.String()
-}
-
-// Run implements [main.subcommand].
-func (p *Pgs) Run(args []string) (r any, err error) {
-	fs := flag.NewFlagSet("pgs", flag.ExitOnError)
-	copy := fs.Bool("copy", false, "Copy to clipboard")
-	fs.Parse(args)
-	p.copy = *copy
-
-	fmt.Fprintln(os.Stderr, "getting data")
-	p.Submissions, err = kobo.GetAssets[kobo.PGSNew](nil)
-	r = p.Result()
+	fmt.Print(sb.String())
 	return
 }
 

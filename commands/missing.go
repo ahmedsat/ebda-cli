@@ -62,7 +62,7 @@ func (m *Missing) Name() string {
 }
 
 // Run implements [main.subcommand].
-func (m *Missing) Run(args []string) (result any, err error) {
+func (m *Missing) Run(args []string) (err error) {
 
 	file, err := os.OpenFile("rejected.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -80,11 +80,11 @@ func (m *Missing) Run(args []string) (result any, err error) {
 		for _, arg := range args {
 			id, err := strconv.Atoi(arg)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			asset, err := kobo.GetAssetByID[kobo.Collect](id)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			data = append(data, asset)
 		}

@@ -11,8 +11,6 @@ import (
 )
 
 type Soil struct {
-	copy    bool
-	records []types.SoilAnalysis
 }
 
 // Description implements [main.subcommand].
@@ -26,35 +24,32 @@ func (s *Soil) Name() string {
 }
 
 // Result implements [main.subcommand].
-func (s *Soil) Result() any {
-	sb := strings.Builder{}
-
-	fmt.Fprintf(&sb, "Farm\tLocation\n")
-	for _, r := range s.records {
-		fmt.Fprintf(&sb, "%s\t%s\n", r.Farm, r.Location)
-	}
-
-	if s.copy {
-		clipboard.WriteAll(sb.String())
-		return "copied to clipboard"
-	}
-
-	return sb.String()
-}
 
 // Run implements [main.subcommand].
-func (s *Soil) Run(args []string) (r any, err error) {
+func (s *Soil) Run(args []string) (err error) {
+
 	fs := flag.NewFlagSet("soil", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	fs.Parse(args)
-	s.copy = *copy
 
-	s.records, err = frappe.Get[types.SoilAnalysis](nil, frappe.List{"farm", "location"}, nil)
+	sb := strings.Builder{}
+	fmt.Fprintf(&sb, "Farm\tLocation\n")
+
+	records, err := frappe.Get[types.SoilAnalysis](nil, frappe.List{"farm", "location"}, nil)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	for _, r := range records {
+		fmt.Fprintf(&sb, "%s\t%s\n", r.Farm, r.Location)
 	}
 
-	r = s.Result()
+	if *copy {
+		clipboard.WriteAll(sb.String())
+		fmt.Println("copied to clipboard")
+		return
+	}
+
+	fmt.Print(sb.String())
 
 	return
 }
