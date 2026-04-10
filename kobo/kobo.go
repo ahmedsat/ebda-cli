@@ -80,6 +80,44 @@ func GetAssets[T KoboAsset](query Query) (result []T, err error) {
 	return
 }
 
+func StreamAssets[T KoboAsset](query Query) (<-chan T, <-chan error) {
+	out := make(chan T)
+	errCh := make(chan error, 1) // buffered to avoid goroutine leak
+
+	go func() {
+		defer close(out)
+		defer close(errCh)
+
+		start := 0
+
+		res, err := GetAssetsExt[T](query, 0, start)
+		if err != nil {
+			errCh <- err
+			return
+		}
+
+		for {
+			for _, item := range res.Results {
+				out <- item
+			}
+
+			if res.Next == "" {
+				return
+			}
+
+			start += len(res.Results)
+
+			res, err = GetAssetsExt[T](query, 0, start)
+			if err != nil {
+				errCh <- err
+				return
+			}
+		}
+	}()
+
+	return out, errCh
+}
+
 func GetAssetByID[T KoboAsset](id int) (result T, err error) {
 	var t T
 	url, err := url.Parse(config.KoboBaseURL)
@@ -166,7 +204,7 @@ func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResp
 	decoder := json.NewDecoder(resp.Body)
 
 	// utils.SaveHttpResponse(*resp)
-	// decoder.DisallowUnknownFields()
+	decoder.DisallowUnknownFields()
 
 	err = decoder.Decode(&result)
 	if err != nil {

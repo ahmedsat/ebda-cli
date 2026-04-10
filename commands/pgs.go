@@ -36,9 +36,9 @@ func (p *Pgs) Result() any {
 	}, "\t"))
 	for _, s := range p.Submissions {
 		fmt.Fprintln(&sb, strings.Join([]string{
-			s.FarmCode,
-			s.VisitDate,
-			s.EngName,
+			s.AtHouseFarmId,
+			s.AtHouseVisitDate,
+			s.EngineerDataEngineerName,
 			s.Label,
 		}, "\t"))
 	}

@@ -5,8 +5,7 @@ go 1.24.9
 require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/gen2brain/go-fitz v1.24.15
-	github.com/paulsmith/gogeos v0.1.2
-	github.com/pebbe/go-proj-4 v5.0.0+incompatible
+	github.com/go-chi/chi/v5 v5.2.5
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
 )

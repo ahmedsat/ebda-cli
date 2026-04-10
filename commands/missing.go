@@ -43,8 +43,6 @@ func init() {
 	runner = utils.NewSyncRunner(10, 0)
 }
 
-var userRegionMap = map[string]string{}
-
 type Missing struct {
 }
 

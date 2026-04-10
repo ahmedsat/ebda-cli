@@ -17,8 +17,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const dateLayout = "2/Jan/2006"
-
 type Plan struct {
 	gorm.Model
 	EngineerName     string

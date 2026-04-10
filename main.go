@@ -6,6 +6,7 @@ import (
 
 	"github.com/ahmedsat/ebda-cli/commands"
 	"github.com/ahmedsat/ebda-cli/commands/training"
+	"github.com/ahmedsat/ebda-cli/commands/web"
 	"github.com/ahmedsat/ebda-cli/config"
 	"github.com/ahmedsat/ebda-cli/frappe"
 )
@@ -37,6 +38,7 @@ func init() {
 		&commands.Info{},
 		&commands.Farm{},
 		&training.Training{},
+		&web.WebUi{},
 	)
 }
 

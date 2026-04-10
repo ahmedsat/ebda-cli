@@ -207,7 +207,7 @@ func (f *Farm) Run(args []string) (result any, err error) {
 				rejected := 0
 				pending := 0
 				for _, s := range pgsSubmissions {
-					if s.FarmCode == farm.FarmId {
+					if s.AtHouseFarmId == farm.FarmId {
 						count++
 						switch s.ValidationStatus.Label {
 						case "Approved":
