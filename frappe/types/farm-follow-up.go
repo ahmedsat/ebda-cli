@@ -1,6 +1,9 @@
 package types
 
 import (
+	"strings"
+	"time"
+
 	"github.com/ahmedsat/ebda-cli/frappe"
 )
 
@@ -173,7 +176,6 @@ func (f *FarmFollowUp) Rate() error {
 
 	checks := []check{
 		{"لايوجد موقع", f.GPS != "", 3},
-		{"لا يوجد تاريخ زيارة", f.VisitDate != "", 3},
 		{"اسم المتابع غير موجود", f.FollowerName != "", 5},
 		{"صورة المتابع مع المزارعين غير موجودة", f.PictureOfFollower != "", 5},
 		// {"عدد المزارعين غير مطابق لاسمائهم", f.FarmersCount == len(f.FarmersNames), 3},
@@ -209,6 +211,32 @@ func (f *FarmFollowUp) Rate() error {
 	// BiosProductsDetails
 	if f.UsesBioProducts == "نعم" {
 		checks = append(checks, check{"لم يتم ذكر المنتجات الحيوية المستخدمة", len(f.BiosProductsDetails) > 0, 3})
+	}
+
+	if f.VisitDate == "" {
+		checks = append(checks, check{"لا يوجد تاريخ زيارة", true, 3})
+	} else {
+		creation, err := time.Parse(frappe.TimeLayout, strings.Split(f.Creation, " ")[0])
+		if err != nil {
+			return err
+		}
+
+		visitDate, err := time.Parse(frappe.TimeLayout, strings.Split(f.VisitDate, " ")[0])
+		if err != nil {
+			return err
+		}
+
+		const permissibleTimeDiff = 24 * time.Hour
+
+		// time diff
+		if visitDate.Sub(creation) > permissibleTimeDiff {
+			checks = append(checks, check{"تلاعب بتاريخ الزيارة", true, 0})
+		}
+
+		// time diff
+		if visitDate.Sub(creation) > permissibleTimeDiff {
+			checks = append(checks, check{"تلاعب بتاريخ الزيارة", true, 0})
+		}
 	}
 
 	var (

@@ -67,7 +67,7 @@ func (m *MapRecord) Parse() error {
 		Coords: m.Coordinates,
 	}.GeodesicArea()
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %s", m.Name, err)
 	}
 	m.Area_in_feddan = area / 4200
 

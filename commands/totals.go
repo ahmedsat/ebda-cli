@@ -18,15 +18,15 @@ func (t *Totals) Run(args []string) (err error) {
 	fs := flag.NewFlagSet("totals", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	formStr := fs.String("from", "1-1-2022", "Date part of ISO")
-	toSt := fs.String("to", time.Now().Format("2-1-2006"), "Date part of ISO")
+	toSt := fs.String("to", time.Now().Format(frappe.TimeLayout), "Date part of ISO")
 	fs.Parse(args)
 
 	// parse date
-	form, err := time.Parse("2-1-2006", *formStr)
+	form, err := time.Parse(frappe.TimeLayout, *formStr)
 	if err != nil {
 		return
 	}
-	to, err := time.Parse("2-1-2006", *toSt)
+	to, err := time.Parse(frappe.TimeLayout, *toSt)
 	if err != nil {
 		return
 	}

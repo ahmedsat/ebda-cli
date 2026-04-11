@@ -29,8 +29,6 @@ import (
 	"gorm.io/gorm"
 )
 
-var runner *utils.SyncRunner
-
 type SubmissionState struct {
 	gorm.Model
 	FarmersDone  bool
@@ -40,7 +38,6 @@ type SubmissionState struct {
 
 func init() {
 	config.MigrationsList = append(config.MigrationsList, &SubmissionState{})
-	runner = utils.NewSyncRunner(10, 0)
 }
 
 type Missing struct {
@@ -110,6 +107,7 @@ func (m *Missing) Run(args []string) (err error) {
 	}
 	n.Run()
 
+	runner := utils.NewSyncRunner(10, 100)
 	counter := 1
 	for _, d := range data {
 		runner.Run(func() (err error) {

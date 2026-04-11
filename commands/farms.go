@@ -4,8 +4,11 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
+	"math"
 	"os"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/ahmedsat/ebda-cli/frappe"
@@ -15,26 +18,52 @@ import (
 	"github.com/atotto/clipboard"
 )
 
-//go:embed farms.tsv
-var farms string
-var farmsMap map[string][]string
+const MapOk = ""
 
-func init() {
-	farmsMap = map[string][]string{}
-	for line := range strings.SplitSeq(farms, "\n") {
-		if line == "" {
-			continue
-		}
-		fields := strings.Split(line, "\t")
-		farmsMap[fields[0]] = fields[1:]
-	}
+type output struct {
+	// target
+	code           string
+	arabic_name    string
+	Region         string
+	countOfFarmers int
+	area           float64
+	eng            string
+	date           string
+
+	// follow up
+	countOfFollowUps int
+	visitRate        float64
+	issues           string
+	Map              string
+	hasSoil          bool
+	// rate             float64
+
+	// pgs
+	countOfPGS int
+	status     string
+	auditorEng string
 }
 
-type Farm struct{}
+type Farm struct {
+	farms           []types.Farm
+	applications    []types.FarmApplication
+	maps            []types.MapRecord
+	solis           []types.SoilAnalysis
+	PGSs            []kobo.PGSNew
+	followUps       []types.FarmFollowUp
+	io              *utils.SyncIoWriter
+	applicationsMap utils.LockableMap[string, int]    // map[string]int
+	farmsMap        utils.LockableMap[string, int]    // map[string]int
+	codesMap        utils.LockableMap[string, int]    // map[string]int
+	outputMap       utils.LockableMap[string, output] // map[string]output
+
+	followUpFrom time.Time
+	followUpTo   time.Time
+}
 
 // Description implements [main.subcommand].
 func (f *Farm) Description() string {
-	return "information about farms (experimental)"
+	return "information about farms"
 }
 
 // Name implements [main.subcommand].
@@ -42,195 +71,342 @@ func (f *Farm) Name() string {
 	return "farms"
 }
 
-// Result implements [main.subcommand].
-func (f *Farm) Result() any {
-	return nil
-}
-
 // Run implements [main.subcommand].
 func (f *Farm) Run(args []string) (err error) {
 
-	runner := utils.NewSyncRunner(10, 100)
-
-	firstDay := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.Local)
-	lastDay := time.Now()
-
 	fs := flag.NewFlagSet("farms", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
-	pgs := fs.Bool("pgs", false, "Extract PGS data from kobo")
-	followUp := fs.Bool("follow-up", false, "Follow up")
-	farmers := fs.Bool("farmers", false, "Farmers")
-	start := fs.String("start", firstDay.Format("2-1-2006"), "Start date")
-	end := fs.String("end", lastDay.Format("2-1-2006"), "End date")
+	followUpFrom := fs.String("follow-up-from", "1-1-2022", "Date part of ISO")
+	followUpTo := fs.String("to", time.Now().Format(utils.TimeLayout), "Date part of ISO")
 	fs.Parse(args)
-	args = fs.Args()
 
-	firstDay, err = time.Parse("2-1-2006", *start)
+	from, err := time.Parse(utils.TimeLayout, *followUpFrom)
+	if err != nil {
+		return
+	}
+	to, err := time.Parse(utils.TimeLayout, *followUpTo)
 	if err != nil {
 		return
 	}
 
-	lastDay, err = time.Parse("2-1-2006", *end)
+	f.followUpFrom = from
+	f.followUpTo = to
+
+	f.farmsMap = utils.NewLockableMap[string, int]()        //make(map[string]int)
+	f.applicationsMap = utils.NewLockableMap[string, int]() //make(map[string]int)
+	f.codesMap = utils.NewLockableMap[string, int]()        //make(map[string]int)
+	f.outputMap = utils.NewLockableMap[string, output]()    //make(map[string]output)
+
+	f.io = &utils.SyncIoWriter{Writer: os.Stderr}
+	runner := utils.NewSyncRunner(1, 0)
+	fmt.Fprintln(f.io, "getting data")
+	runner.Run(f.getApplications)
+	runner.Run(f.getFarms)
+	runner.Run(f.getMaps)
+	runner.Run(f.getSolis)
+	runner.Run(f.getFollowUps)
+	runner.Run(f.getPGSs)
+
+	err = runner.Wait()
 	if err != nil {
-		return
+		return err
 	}
 
-	filters := frappe.Filters{
-		frappe.NewFilter("type", frappe.Eq, "Farm"),
-		frappe.NewFilter("farm_status", frappe.Neq, "Cancelled"),
+	err = runner.Wait()
+	if err != nil {
+		return err
 	}
 
-	if len(args) > 0 {
-		filters = append(filters, frappe.NewFilter("farm_id", frappe.In, frappe.FiltersValueList(args...)))
+	sb := strings.Builder{}
+
+	fmt.Fprintln(&sb, strings.Join([]string{
+		"code",
+		"arabic_name",
+		"region",
+		"countOfFarmers",
+		"area",
+		"eng",
+		"date",
+		"countOfFollowUps",
+		// "visitRate",
+		"issues",
+		"rate",
+		"countOfPGS",
+		"status",
+		"auditorEng",
+	}, "\t"))
+	for k, v := range f.outputMap.Map {
+
+		rate := 2 + v.visitRate/float64(v.countOfFollowUps)
+
+		if v.Map != MapOk {
+			if v.Map == "" {
+				v.Map = "بدون خريطة"
+			}
+			rate--
+			v.issues = strings.Join([]string{v.issues, v.Map}, "\n")
+		}
+
+		if !v.hasSoil {
+			rate--
+			v.issues = strings.Join([]string{v.issues, "بدون عينة تربة"}, "\n")
+		}
+
+		fmt.Fprintln(&sb, strings.Join([]string{
+			k,
+			v.arabic_name,
+			v.Region,
+			fmt.Sprintf("%d", v.countOfFarmers),
+			fmt.Sprintf("%.2f", v.area),
+			v.eng,
+			v.date,
+			fmt.Sprintf("%d", v.countOfFollowUps),
+			// fmt.Sprintf("%.2f", v.visitRate/float64(v.countOfFollowUps)),
+			fmt.Sprintf("\"%s\"", strings.TrimSpace(v.issues)),
+			fmt.Sprintf("%.2f", rate/3),
+			fmt.Sprintf("%d", v.countOfPGS),
+			fmt.Sprintf("\"%s\"", strings.TrimSpace(v.status)),
+			fmt.Sprintf("\"%s\"", strings.TrimSpace(v.auditorEng)),
+		}, "\t"))
 	}
-
-	fmt.Fprintln(os.Stderr, "getting data from frappe...")
-	farms, err := frappe.Get[types.Farm](filters, frappe.List{
-		"farm_id",
-		"name",
-	}, nil)
-
-	var out utils.SyncIoWriter
-	out.Writer = os.Stdout
 
 	if *copy {
-		sb := strings.Builder{}
-		out.Writer = &sb
-		defer func() {
-			clipboard.WriteAll(sb.String())
-		}()
-	}
-
-	fmt.Fprintf(&out, "%s", strings.Join([]string{
-		"farm code", "farm name", "arabic_name", "region", "eng", "group",
-	}, "\t"))
-
-	if *farmers {
-		fmt.Fprintf(&out, "\tcount of farmers\thas id\thas phone")
-	}
-
-	var followUps []types.FarmFollowUp
-	if *followUp {
-		fmt.Fprintln(os.Stderr, "getting follow-up data from frappe...")
-		fmt.Fprint(&out, "\tcount of visits\trate of visits")
-		followUps, err = frappe.Get[types.FarmFollowUp](frappe.Filters{
-			frappe.NewFilter("visit_date", frappe.Gte, firstDay.Format("2006-01-02")),
-			frappe.NewFilter("visit_date", frappe.Lte, lastDay.Format("2006-01-02")),
-		}, frappe.List{"name", "farm", "farm_code"}, nil)
+		err = clipboard.WriteAll(sb.String())
 		if err != nil {
-			return
+			return err
 		}
+	} else {
+		fmt.Print(sb.String())
 	}
 
-	var pgsSubmissions []kobo.PGSNew
-	if *pgs {
-		fmt.Fprintln(os.Stderr, "getting pgs data from kobo...")
-		fmt.Fprintf(&out, "\tPGS Count\tApproved\tRejected\tPending")
-		pgsSubmissions, err = kobo.GetAssets[kobo.PGSNew](kobo.Query{
-			"at_house/visit_date": kobo.Query{
-				"$gte": firstDay.Format("2006-01-02"),
-				"$lte": lastDay.Format("2006-01-02"),
-			},
-		})
-		if err != nil {
-			return
-		}
+	return nil
+}
+
+func (f *Farm) getFollowUps() (err error) {
+	fmt.Fprintln(f.io, "getting followUps data ")
+	f.followUps, err = frappe.Get[types.FarmFollowUp](frappe.Filters{
+		frappe.NewFilter("creation", frappe.Gte, f.followUpFrom.Format(frappe.TimeLayout)),
+		frappe.NewFilter("creation", frappe.Lte, f.followUpTo.AddDate(0, 0, 1).Format(frappe.TimeLayout)), // offset by 1 day to include the last day
+	}, frappe.List{"name"}, nil)
+	if err != nil {
+		return err
 	}
-	fmt.Fprintf(&out, "\n")
 
-	fmt.Fprintln(os.Stderr, "start evaluating farms")
-
-	count := 1
-	for _, farm := range farms {
+	fmt.Fprintln(f.io, "followUps rates calculation...")
+	runner := utils.NewSyncRunner(10, 100)
+	atomicCount := atomic.Int64{}
+	for i := range f.followUps {
 		runner.Run(func() (err error) {
-			if _, ok := farmsMap[farm.FarmId]; !ok {
+			defer func() {
+				atomicCount.Add(1)
+				fmt.Fprintf(f.io, "\rrating followUps %d/%d (%.2f%%)",
+					atomicCount.Load(), len(f.followUps), float64(atomicCount.Load())/float64(len(f.followUps))*100)
+			}()
+			err = f.followUps[i].Rate()
+			if err != nil {
 				return
 			}
-			sb := strings.Builder{}
-			defer func() {
-				fmt.Fprintln(&out, sb.String())
-				n, _ := utils.NewProgressNotification(
-					"Farms Report",
-					fmt.Sprintf("Getting Data from frappe [%d:%d]", count, len(farms)),
-					"farms-report", count*100/len(farms),
-				)
-				n.Run()
-				count++
-			}()
+			f.outputMap.Lock()
+			output := f.outputMap.Map[f.followUps[i].FarmCode]
 
-			fmt.Fprintf(&sb, "%s\t%s", farm.FarmId, strings.Join(farmsMap[farm.FarmId], "\t"))
+			output.countOfFollowUps++
+			output.visitRate += f.followUps[i].RatePercent
 
-			if *farmers {
+			output.issues = strings.Join(append([]string{output.issues}, f.followUps[i].Issues...), "\n")
 
-				farm, err := frappe.Get1[types.Farm](farm.Name)
-				if err != nil {
-					return err
-				}
+			f.outputMap.Map[f.followUps[i].FarmCode] = output
 
-				var countOfFarmers, hasId, hasPhone int
-				for _, farmer := range farm.Farmers {
-					countOfFarmers++
-					if farmer.NationalIdNumber != "" {
-						hasId++
-					}
-					if farmer.Phone != "" {
-						hasPhone++
-					}
-				}
-
-				fmt.Fprintf(&sb, "\t%d\t%d\t%d", countOfFarmers, hasId, hasPhone)
-			}
-
-			if *followUp {
-				rate := 0.0
-				count := 0
-				for _, followUp := range followUps {
-					if followUp.Farm == farm.Name {
-						err = followUp.Rate()
-						if err != nil {
-							return
-						}
-						count++
-						rate += followUp.RatePercent
-					}
-				}
-				if count != 0 {
-					fmt.Fprintf(&sb, "\t%d\t%.2f", count, rate/float64(count))
-				} else {
-					fmt.Fprintf(&sb, "\t0\t0")
-				}
-			}
-
-			if *pgs {
-				count := 0
-				approved := 0
-				rejected := 0
-				pending := 0
-				for _, s := range pgsSubmissions {
-					if s.AtHouseFarmId == farm.FarmId {
-						count++
-						switch s.ValidationStatus.Label {
-						case "Approved":
-							approved++
-						case "Not Approved":
-							rejected++
-						default:
-							pending++
-						}
-					}
-				}
-				if count != 0 {
-					fmt.Fprintf(&sb, "\t%d\t%d\t%d\t%d", count, approved, rejected, pending)
-				} else {
-					fmt.Fprintf(&sb, "\t0\t0\t0\t0")
-				}
-			}
-
+			f.outputMap.Unlock()
 			return
 		})
 	}
+	err = runner.Wait()
+	if err != nil {
+		return
+	}
+	fmt.Fprintln(f.io)
+	return nil
+}
 
-	return runner.Wait()
+func (f *Farm) getPGSs() (err error) {
+	fmt.Fprintln(f.io, "getting PGSs data")
+	start := 0
+	res, err := kobo.GetAssetsExt[(kobo.PGSNew)](nil, 0, start)
+	if err != nil {
+		return
+	}
+
+	count := res.Count
+
+	f.PGSs = append(f.PGSs, res.Results...)
+	fmt.Fprintf(f.io, "\rPGS progress [%d : %d]", len(f.PGSs), count)
+
+	for res.Next != "" {
+		start += len(res.Results)
+		res, err = kobo.GetAssetsExt[(kobo.PGSNew)](nil, 0, start)
+		if err != nil {
+			return
+		}
+		f.PGSs = append(f.PGSs, res.Results...)
+		fmt.Fprintf(f.io, "\rPGS progress [%d : %d]", len(f.PGSs), count)
+	}
+
+	for i := range f.PGSs {
+		f.outputMap.Lock()
+		output := f.outputMap.Map[f.PGSs[i].AtHouseFarmId]
+		output.countOfPGS++
+		output.status = fmt.Sprintf("%s\n%s", output.status, f.PGSs[i].ValidationStatus.Label)
+		output.auditorEng = fmt.Sprintf("%s\n%s", output.auditorEng, f.PGSs[i].EngineerDataEngineerName)
+		f.outputMap.Map[f.PGSs[i].AtHouseFarmId] = output
+		f.outputMap.Unlock()
+	}
+
+	fmt.Fprintln(f.io)
+	return
+}
+
+func (f *Farm) getSolis() (err error) {
+	fmt.Fprintln(f.io, "getting solis data")
+	f.solis, err = frappe.Get[types.SoilAnalysis](nil, frappe.List{"farm", "location"}, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := range f.solis {
+		if f.solis[i].Location == "" {
+			continue
+		}
+		f.farmsMap.Lock()
+		farm := f.farms[f.farmsMap.Map[f.solis[i].Farm]]
+		f.outputMap.Lock()
+		output := f.outputMap.Map[farm.FarmId]
+
+		output.hasSoil = true
+		f.outputMap.Map[farm.FarmId] = output
+
+		f.outputMap.Unlock()
+		f.farmsMap.Unlock()
+	}
+
+	return nil
+}
+
+func (f *Farm) getMaps() (err error) {
+	fmt.Fprintln(f.io, "getting maps data")
+	f.maps, err = frappe.Get[types.MapRecord](nil, nil, nil)
+	if err != nil {
+		return
+	}
+
+	slices.SortFunc(f.maps, func(a, b types.MapRecord) int {
+		// creationA, err := time.Parse(frappe.TimeLayout, a.Base.Creation)
+		// utils.Assert(err != nil, err.Error())
+
+		// creationB, err := time.Parse(frappe.TimeLayout, b.Base.Creation)
+		// utils.Assert(err != nil, err.Error())
+
+		// return int(creationA.Unix() - creationB.Unix())
+		return int(a.Area_in_feddan - b.Area_in_feddan)
+	})
+
+	fmt.Fprintln(f.io, "parsing maps data")
+	runner := utils.NewSyncRunner(100, 100)
+	for i := range f.maps {
+		runner.Run(func() (err error) {
+			err = f.maps[i].Parse()
+			if err != nil {
+				return
+			}
+
+			f.farmsMap.Lock()
+			defer f.farmsMap.Unlock()
+			f.outputMap.Lock()
+			defer f.outputMap.Unlock()
+
+			farm := f.farms[f.farmsMap.Map[f.maps[i].Farm]]
+			output := f.outputMap.Map[farm.FarmId]
+
+			if math.Abs(f.maps[i].Area_in_feddan-farm.Area) > 0.25 {
+				output.Map = fmt.Sprintf("مساحة غير متطابقة %0.2f %0.2f", f.maps[i].Area_in_feddan, farm.Area)
+			} else {
+				output.Map = MapOk
+			}
+
+			f.outputMap.Map[farm.FarmId] = output
+			return
+		})
+	}
+	err = runner.Wait()
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (f *Farm) getApplications() (err error) {
+	fmt.Fprintln(f.io, "getting applications data")
+	f.applications, err = frappe.Get[types.FarmApplication](nil, frappe.List{"name", "engineer_name", "user_name", "farm_name"}, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := range f.applications {
+		f.applicationsMap.Lock()
+		f.applicationsMap.Map[f.applications[i].Name] = i
+		f.applicationsMap.Unlock()
+	}
+
+	return nil
+}
+
+func (f *Farm) getFarms() (err error) {
+	fmt.Fprintln(f.io, "getting farms data")
+	f.farms, err = frappe.Get[types.Farm](frappe.Filters{
+		frappe.NewFilter("type", frappe.Eq, "Farm"),
+		frappe.NewFilter("farm_status", frappe.Neq, "Cancelled"),
+	},
+		frappe.List{
+			"name",
+			"farm_id",
+			"arabic_name",
+			"farm_application",
+			"region",
+			"total_farmers",
+			"farm_area__feddan",
+			"creation_date",
+		}, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := range f.farms {
+
+		f.farmsMap.Lock()
+		f.farmsMap.Map[f.farms[i].Name] = i
+
+		f.codesMap.Lock()
+		f.codesMap.Map[f.farms[i].FarmId] = i
+
+		f.applicationsMap.Lock()
+		app := f.applicationsMap.Map[f.farms[i].FarmApplication]
+
+		f.outputMap.Lock()
+		output := f.outputMap.Map[f.farms[i].FarmId]
+		output.code = f.farms[i].FarmId
+		output.arabic_name = f.farms[i].ArabicName
+		output.Region = f.farms[i].Region
+		output.countOfFarmers = f.farms[i].TotalFarmers
+		output.area = f.farms[i].Area
+		output.eng = f.applications[app].EngineerName
+		output.date = f.farms[i].CreationDate
+		f.outputMap.Map[f.farms[i].FarmId] = output
+
+		f.farmsMap.Unlock()
+		f.codesMap.Unlock()
+		f.applicationsMap.Unlock()
+		f.outputMap.Unlock()
+	}
+	return nil
 }
 
 // Usage implements [main.subcommand].
