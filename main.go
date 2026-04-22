@@ -8,7 +8,6 @@ import (
 	"github.com/ahmedsat/ebda-cli/commands/training"
 	"github.com/ahmedsat/ebda-cli/commands/web"
 	"github.com/ahmedsat/ebda-cli/config"
-	"github.com/ahmedsat/ebda-cli/frappe"
 )
 
 var executable string
@@ -65,13 +64,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	res, err := frappe.Login()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	fmt.Fprintf(os.Stderr, "Logged result %+v\n", res)
 
 	executable = os.Args[0]
 	subcommand := os.Args[1]

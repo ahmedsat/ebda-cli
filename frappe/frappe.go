@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strings"
+	"sync"
 
 	"github.com/ahmedsat/ebda-cli/config"
 	"github.com/ahmedsat/ebda-cli/utils"
@@ -20,9 +22,51 @@ type FrappeDoctype interface {
 }
 
 var client *http.Client
+var authMu sync.Mutex
+var authenticated bool
 
 func Do(req *http.Request) (*http.Response, error) {
-	return client.Do(req)
+	if req == nil {
+		return nil, errors.New("nil request")
+	}
+
+	err := makeRequestReplayable(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if isLoginRequest(req) {
+		return rawDo(req)
+	}
+
+	err = ensureAuthenticated()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := rawDo(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if !shouldRetryAuthentication(resp.StatusCode) {
+		return resp, nil
+	}
+
+	resp.Body.Close()
+	resetAuthentication()
+
+	err = ensureAuthenticated()
+	if err != nil {
+		return nil, err
+	}
+
+	retryReq, err := cloneRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return rawDo(retryReq)
 }
 
 func init() {
@@ -33,6 +77,76 @@ func init() {
 	client = &http.Client{
 		Jar: jar,
 	}
+}
+
+func rawDo(req *http.Request) (*http.Response, error) {
+	return client.Do(req)
+}
+
+func ensureAuthenticated() error {
+	authMu.Lock()
+	defer authMu.Unlock()
+
+	if authenticated {
+		return nil
+	}
+
+	_, err := loginLocked()
+	if err != nil {
+		return err
+	}
+
+	authenticated = true
+	return nil
+}
+
+func resetAuthentication() {
+	authMu.Lock()
+	defer authMu.Unlock()
+	authenticated = false
+}
+
+func isLoginRequest(req *http.Request) bool {
+	return strings.TrimSuffix(req.URL.Path, "/") == "/api/method/login"
+}
+
+func shouldRetryAuthentication(statusCode int) bool {
+	return statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden
+}
+
+func makeRequestReplayable(req *http.Request) error {
+	if req.Body == nil || req.GetBody != nil {
+		return nil
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
+	req.Body.Close()
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(body)), nil
+	}
+	req.ContentLength = int64(len(body))
+
+	return nil
+}
+
+func cloneRequest(req *http.Request) (*http.Request, error) {
+	clone := req.Clone(req.Context())
+	if req.GetBody == nil {
+		return clone, nil
+	}
+
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, err
+	}
+
+	clone.Body = body
+	return clone, nil
 }
 
 func Get[T FrappeDoctype](filters Filters, fields, expand List) (result []T, err error) {

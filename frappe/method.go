@@ -43,7 +43,7 @@ func CallMethod(method string, args map[string]any) (result []byte, err error) {
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := Do(req)
 	if err != nil {
 		return
 	}
@@ -157,7 +157,7 @@ func UploadFile(
 	req.Header.Set("Accept", "application/json")
 	req.ContentLength = int64(body.Len())
 
-	resp, err := client.Do(req)
+	resp, err := Do(req)
 	if err != nil {
 		return
 	}
@@ -197,7 +197,7 @@ func TestUrl(url_ string) (resp *http.Response, err error) {
 	if err != nil {
 		return
 	}
-	resp, err = client.Do(req)
+	resp, err = Do(req)
 
 	if err != nil {
 		return

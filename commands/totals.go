@@ -13,20 +13,22 @@ import (
 
 type Totals struct{}
 
+const cliTimeFormat = "2-1-2006"
+
 // Run implements [main.subcommand].
 func (t *Totals) Run(args []string) (err error) {
 	fs := flag.NewFlagSet("totals", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	formStr := fs.String("from", "1-1-2022", "Date part of ISO")
-	toSt := fs.String("to", time.Now().Format(frappe.TimeLayout), "Date part of ISO")
+	toSt := fs.String("to", time.Now().Format(cliTimeFormat), "Date part of ISO")
 	fs.Parse(args)
 
 	// parse date
-	form, err := time.Parse(frappe.TimeLayout, *formStr)
+	form, err := time.Parse(cliTimeFormat, *formStr)
 	if err != nil {
 		return
 	}
-	to, err := time.Parse(frappe.TimeLayout, *toSt)
+	to, err := time.Parse(cliTimeFormat, *toSt)
 	if err != nil {
 		return
 	}

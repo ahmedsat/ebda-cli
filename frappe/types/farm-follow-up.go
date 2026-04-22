@@ -211,12 +211,12 @@ func (f *FarmFollowUp) Rate() error {
 	if f.VisitDate == "" {
 		checks = append(checks, utils.Check{Name: "لا يوجد تاريخ زيارة", Ok: true, Weight: 3})
 	} else {
-		creation, err := time.Parse(frappe.TimeLayout, strings.Split(f.Creation, " ")[0])
+		creation, err := time.Parse(time.DateOnly, strings.Split(f.Creation, " ")[0])
 		if err != nil {
 			return err
 		}
 
-		visitDate, err := time.Parse(frappe.TimeLayout, strings.Split(f.VisitDate, " ")[0])
+		visitDate, err := time.Parse(time.DateOnly, strings.Split(f.VisitDate, " ")[0])
 		if err != nil {
 			return err
 		}

@@ -187,8 +187,8 @@ func (f *Farm) Run(args []string) (err error) {
 func (f *Farm) getFollowUps() (err error) {
 	fmt.Fprintln(f.io, "getting followUps data ")
 	f.followUps, err = frappe.Get[types.FarmFollowUp](frappe.Filters{
-		frappe.NewFilter("visit_date", frappe.Gte, f.followUpFrom.Format(frappe.TimeLayout)),
-		frappe.NewFilter("visit_date", frappe.Lte, f.followUpTo.AddDate(0, 0, 1).Format(frappe.TimeLayout)), // offset by 1 day to include the last day
+		frappe.NewFilter("visit_date", frappe.Gte, f.followUpFrom.Format(time.DateOnly)),
+		frappe.NewFilter("visit_date", frappe.Lte, f.followUpTo.AddDate(0, 0, 1).Format(time.DateOnly)), // offset by 1 day to include the last day
 	}, frappe.List{"name"}, nil)
 	if err != nil {
 		return err
