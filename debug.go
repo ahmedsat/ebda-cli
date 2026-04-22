@@ -2,6 +2,12 @@
 
 package main
 
+import "github.com/ahmedsat/ebda-cli/commands"
+
 func init() {
-	subcommands = append(subcommands, "training", "map", "pgs", "records")
+	AddSubCommand(
+		&commands.Missing{},
+		&commands.Debug{},
+		&commands.VisitsPlan{},
+	)
 }

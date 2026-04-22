@@ -1,41 +1,63 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+	"strings"
+
+	"github.com/ahmedsat/ebda-cli/kobo"
+	"github.com/atotto/clipboard"
 )
 
-func Pgs(args []string) (err error) {
-	defer func() {
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "PGS")
-		}
-	}()
-	fmt.Println("PGS")
+type Pgs struct {
+}
 
-	formUrl := "https://kf.kobotoolbox.org/api/v2/assets/aX4NJWgge6tooXjfSYXhrq" + args[0]
-	req, err := http.NewRequest("GET", formUrl, nil)
-	if err != nil {
+// Description implements [main.subcommand].
+func (p *Pgs) Description() string {
+	return "Extract PGS data from kobo"
+}
+
+// Name implements [main.subcommand].
+func (p *Pgs) Name() string {
+	return "pgs"
+}
+
+// Run implements [main.subcommand].
+func (p *Pgs) Run(args []string) (err error) {
+	fs := flag.NewFlagSet("pgs", flag.ExitOnError)
+	copy := fs.Bool("copy", false, "Copy to clipboard")
+	fs.Parse(args)
+
+	fmt.Fprintln(os.Stderr, "getting data")
+	Submissions, err := kobo.GetAssets[kobo.PGSNew](nil)
+	sb := strings.Builder{}
+	fmt.Fprintln(&sb, strings.Join([]string{
+		"Code",
+		"Visit Date",
+		"Eng Name",
+		"Label",
+	}, "\t"))
+	for _, s := range Submissions {
+		fmt.Fprintln(&sb, strings.Join([]string{
+			s.AtHouse.FarmId,
+			s.AtHouse.VisitDate,
+			s.EngineerData.EngineerName,
+			s.Label,
+		}, "\t"))
+	}
+
+	if *copy {
+		clipboard.WriteAll(sb.String())
+		fmt.Println("copied to clipboard")
 		return
 	}
 
-	token := os.Getenv("KOBO_AUTH_TOKEN")
-	req.Header.Set("Authorization", "Token "+token)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		err = fmt.Errorf("http error: %d", res.StatusCode)
-		return
-	}
-
-	io.Copy(os.Stderr, res.Body)
-
+	fmt.Print(sb.String())
 	return
+}
+
+// Usage implements [main.subcommand].
+func (p *Pgs) Usage() string {
+	panic("unimplemented")
 }
