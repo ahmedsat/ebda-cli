@@ -111,7 +111,6 @@ func (m *Missing) Run(args []string) (err error) {
 	counter := 1
 	for _, d := range data {
 		runner.Run(func() (err error) {
-
 			var submissionState SubmissionState
 			defer func() {
 				if err != nil {
@@ -243,7 +242,22 @@ func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) err
 
 	pointsJson = pointsJson[1 : len(pointsJson)-1]
 
-	maps, err := frappe.Get[types.MapRecord](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, collect.Farm)}, nil, nil)
+	farms, err := frappe.Get[types.Farm](frappe.Filters{frappe.NewFilter("farm_id", frappe.Eq, collect.Code)}, nil, nil)
+	if err != nil {
+		return err
+	}
+
+	if len(farms) == 0 {
+		return fmt.Errorf("farm not found: %s", collect.Farm)
+	}
+
+	if len(farms) > 1 {
+		return fmt.Errorf("multiple farms found: %s", collect.Farm)
+	}
+
+	farm := farms[0]
+
+	maps, err := frappe.Get[types.MapRecord](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, farm.Name)}, nil, nil)
 	if err != nil {
 		return err
 	}

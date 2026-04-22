@@ -40,9 +40,9 @@ func (p *Pgs) Run(args []string) (err error) {
 	}, "\t"))
 	for _, s := range Submissions {
 		fmt.Fprintln(&sb, strings.Join([]string{
-			s.AtHouseFarmId,
-			s.AtHouseVisitDate,
-			s.EngineerDataEngineerName,
+			s.AtHouse.FarmId,
+			s.AtHouse.VisitDate,
+			s.EngineerData.EngineerName,
 			s.Label,
 		}, "\t"))
 	}

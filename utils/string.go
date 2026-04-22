@@ -62,3 +62,31 @@ func sanitize(s string) string {
 
 	return strings.TrimSpace(string(out))
 }
+
+func ToPascalCase(s string) string {
+	if s == "" {
+		return ""
+	}
+
+	var result []rune
+	var capitalizeNext = true
+
+	for _, r := range s {
+		switch {
+		case r == '_' || r == '-' || r == ' ' || r == ':' || r == '(' || r == ')' || r == '/':
+			capitalizeNext = true
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			if capitalizeNext {
+				result = append(result, unicode.ToUpper(r))
+				capitalizeNext = false
+			} else {
+				result = append(result, unicode.ToLower(r))
+			}
+		default:
+			// skip other symbols
+			capitalizeNext = true
+		}
+	}
+
+	return string(result)
+}

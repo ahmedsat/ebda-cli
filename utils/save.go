@@ -1,10 +1,13 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"time"
 )
 
@@ -48,4 +51,41 @@ func SaveHttpResponse(resp http.Response) {
 
 	fmt.Fprintln(os.Stderr, resp.Status)
 
+}
+
+func RenderHtmlTemplateAndPrintPDF(name, tpl string, data any) error {
+	t := template.Must(template.New(name).Parse(tpl))
+
+	// render HTML to buffer
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		return err
+	}
+
+	// create temp file
+	tmp, err := os.CreateTemp("", name+"-*.html")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name()) // auto delete
+
+	// write HTML
+	if _, err := tmp.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	tmp.Close()
+
+	// output PDF
+	cmd := exec.Command(
+		"brave-browser",
+		"--headless=new",
+		"--disable-gpu",
+		"--no-sandbox",
+		"--print-to-pdf="+name+".pdf",
+		"--no-pdf-header-footer",
+		"--enable-local-file-access",
+		"file://"+tmp.Name(),
+	)
+
+	return cmd.Run()
 }

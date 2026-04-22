@@ -20,6 +20,8 @@ import (
 
 const MapOk = ""
 
+var exceptionMaps = []string{"EG/1247", "EG/1248", "EG/1249"}
+
 type output struct {
 	// target
 	code           string
@@ -185,8 +187,8 @@ func (f *Farm) Run(args []string) (err error) {
 func (f *Farm) getFollowUps() (err error) {
 	fmt.Fprintln(f.io, "getting followUps data ")
 	f.followUps, err = frappe.Get[types.FarmFollowUp](frappe.Filters{
-		frappe.NewFilter("creation", frappe.Gte, f.followUpFrom.Format(frappe.TimeLayout)),
-		frappe.NewFilter("creation", frappe.Lte, f.followUpTo.AddDate(0, 0, 1).Format(frappe.TimeLayout)), // offset by 1 day to include the last day
+		frappe.NewFilter("visit_date", frappe.Gte, f.followUpFrom.Format(frappe.TimeLayout)),
+		frappe.NewFilter("visit_date", frappe.Lte, f.followUpTo.AddDate(0, 0, 1).Format(frappe.TimeLayout)), // offset by 1 day to include the last day
 	}, frappe.List{"name"}, nil)
 	if err != nil {
 		return err
@@ -253,11 +255,11 @@ func (f *Farm) getPGSs() (err error) {
 
 	for i := range f.PGSs {
 		f.outputMap.Lock()
-		output := f.outputMap.Map[f.PGSs[i].AtHouseFarmId]
+		output := f.outputMap.Map[f.PGSs[i].AtHouse.FarmId]
 		output.countOfPGS++
 		output.status = fmt.Sprintf("%s\n%s", output.status, f.PGSs[i].ValidationStatus.Label)
-		output.auditorEng = fmt.Sprintf("%s\n%s", output.auditorEng, f.PGSs[i].EngineerDataEngineerName)
-		f.outputMap.Map[f.PGSs[i].AtHouseFarmId] = output
+		output.auditorEng = fmt.Sprintf("%s\n%s", output.auditorEng, f.PGSs[i].EngineerData.EngineerName)
+		f.outputMap.Map[f.PGSs[i].AtHouse.FarmId] = output
 		f.outputMap.Unlock()
 	}
 
@@ -329,6 +331,10 @@ func (f *Farm) getMaps() (err error) {
 			if math.Abs(f.maps[i].Area_in_feddan-farm.Area) > 0.25 {
 				output.Map = fmt.Sprintf("مساحة غير متطابقة %0.2f %0.2f", f.maps[i].Area_in_feddan, farm.Area)
 			} else {
+				output.Map = MapOk
+			}
+
+			if slices.Contains(exceptionMaps, farm.FarmId) {
 				output.Map = MapOk
 			}
 

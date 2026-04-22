@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ahmedsat/ebda-cli/frappe"
+	"github.com/ahmedsat/ebda-cli/utils"
 )
 
 type BioProductFollowUp struct {
@@ -168,53 +169,47 @@ func (f *FarmFollowUp) Rate() error {
 
 	*f = follow
 
-	type check struct {
-		name   string
-		ok     bool
-		weight float64
-	}
-
-	checks := []check{
-		{"لايوجد موقع", f.GPS != "", 3},
-		{"اسم المتابع غير موجود", f.FollowerName != "", 5},
-		{"صورة المتابع مع المزارعين غير موجودة", f.PictureOfFollower != "", 5},
-		// {"عدد المزارعين غير مطابق لاسمائهم", f.FarmersCount == len(f.FarmersNames), 3},
-		{"لا يوجد محاصيل", len(f.CurrentCrops) != 0, 3},
-		{"معدل انتاج الكمبوست غير موجود", f.CompostProduction > 0, 3},
-		{"كمية الكمبوست غير موجودة", f.CompostQtys > 0, 3},
-		{"لم يتم ذكر التحديات الحالية", f.CurrentChallenges != "", 1},
-		{"لم يتم ذكر تقييم المراجع", f.FollowerAssessment != "", 1},
-		{"لم يتم ذكر التوصيات", f.Recommendations != "", 4},
-		{"لم يتم ذكر هل يوجد مخزن ام لا", f.StorageExist != "", 3},
+	checks := []utils.Check{
+		{Name: "لايوجد موقع", Ok: f.GPS != "", Weight: 3},
+		{Name: "اسم المتابع غير موجود", Ok: f.FollowerName != "", Weight: 5},
+		{Name: "صورة المتابع مع المزارعين غير موجودة", Ok: f.PictureOfFollower != "", Weight: 5},
+		// {Name: "عدد المزارعين غير مطابق لاسمائهم", Ok: f.FarmersCount == len(f.FarmersNames), Weight: 0},
+		{Name: "لا يوجد محاصيل", Ok: len(f.CurrentCrops) != 0, Weight: 3},
+		{Name: "معدل انتاج الكمبوست غير موجود", Ok: f.CompostProduction > 0, Weight: 3},
+		{Name: "كمية الكمبوست غير موجودة", Ok: f.CompostQtys > 0, Weight: 3},
+		{Name: "لم يتم ذكر التحديات الحالية", Ok: f.CurrentChallenges != "", Weight: 1},
+		{Name: "لم يتم ذكر تقييم المراجع", Ok: f.FollowerAssessment != "", Weight: 1},
+		{Name: "لم يتم ذكر التوصيات", Ok: f.Recommendations != "", Weight: 4},
+		{Name: "لم يتم ذكر هل يوجد مخزن ام لا", Ok: f.StorageExist != "", Weight: 3},
 	}
 
 	if f.RecordsFarmBook != 0 {
-		checks = append(checks, check{"صورة دفتر المزرعة غير موجودة", f.RecordImage != "1", 3})
+		checks = append(checks, utils.Check{Name: "صورة دفتر المزرعة غير موجودة", Ok: f.RecordImage != "1", Weight: 3})
 	}
 
 	if f.StorageExist == "نعم" {
-		checks = append(checks, check{"لم يتم ذكر محتويات المخزن", f.WarehousesNotes != "", 3})
+		checks = append(checks, utils.Check{Name: "لم يتم ذكر محتويات المخزن", Ok: f.WarehousesNotes != "", Weight: 3})
 	}
 
 	if f.IntercroppingOrGreenManure == "نعم" {
-		checks = append(checks, check{"لم يتم ذكر نسبة التحميل", f.IntercroppingPercent > 0, 3})
+		checks = append(checks, utils.Check{Name: "لم يتم ذكر نسبة التحميل", Ok: f.IntercroppingPercent > 0, Weight: 3})
 	}
 
 	if f.PlantedTreesOrHedge == "نعم" {
-		checks = append(checks, check{"لم يتم ذكر عدد الاشجار الجديدة", f.TreesCount > 0, 3})
+		checks = append(checks, utils.Check{Name: "لم يتم ذكر عدد الاشجار الجديدة", Ok: f.TreesCount > 0, Weight: 3})
 	}
 
 	if f.HasAnimals == "نعم" {
-		checks = append(checks, check{"لم يتم ذكر انواع الحيوانات", f.AnimalsTypeCount != "", 3})
+		checks = append(checks, utils.Check{Name: "لم يتم ذكر انواع الحيوانات", Ok: f.AnimalsTypeCount != "", Weight: 3})
 	}
 
 	// BiosProductsDetails
 	if f.UsesBioProducts == "نعم" {
-		checks = append(checks, check{"لم يتم ذكر المنتجات الحيوية المستخدمة", len(f.BiosProductsDetails) > 0, 3})
+		checks = append(checks, utils.Check{Name: "لم يتم ذكر المنتجات الحيوية المستخدمة", Ok: len(f.BiosProductsDetails) > 0, Weight: 3})
 	}
 
 	if f.VisitDate == "" {
-		checks = append(checks, check{"لا يوجد تاريخ زيارة", true, 3})
+		checks = append(checks, utils.Check{Name: "لا يوجد تاريخ زيارة", Ok: true, Weight: 3})
 	} else {
 		creation, err := time.Parse(frappe.TimeLayout, strings.Split(f.Creation, " ")[0])
 		if err != nil {
@@ -230,12 +225,12 @@ func (f *FarmFollowUp) Rate() error {
 
 		// time diff
 		if visitDate.Sub(creation) > permissibleTimeDiff {
-			checks = append(checks, check{"تلاعب بتاريخ الزيارة", true, 0})
+			checks = append(checks, utils.Check{Name: "تلاعب بتاريخ الزيارة", Ok: false, Weight: 0})
 		}
 
 		// time diff
-		if visitDate.Sub(creation) > permissibleTimeDiff {
-			checks = append(checks, check{"تلاعب بتاريخ الزيارة", true, 0})
+		if creation.Sub(visitDate) > permissibleTimeDiff {
+			checks = append(checks, utils.Check{Name: "تلاعب بتاريخ الزيارة", Ok: false, Weight: 0})
 		}
 	}
 
@@ -245,14 +240,13 @@ func (f *FarmFollowUp) Rate() error {
 	)
 
 	for _, c := range checks {
-		totalWeight += c.weight
-		if !c.ok {
-			filledWeight += c.weight
-			f.Issues = append(f.Issues, c.name)
+		totalWeight += c.Weight
+		if !c.Ok {
+			filledWeight += c.Weight
+			f.Issues = append(f.Issues, c.Name)
 		}
 	}
 
-	// Failure rate: 0.0 (perfect) → 1.0 (total failure)
 	f.RatePercent = 1 - (filledWeight / totalWeight)
 
 	f.Rated = true

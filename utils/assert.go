@@ -13,9 +13,9 @@ func Assert(condition bool, msgs ...string) {
 
 	_, file, line, ok := runtime.Caller(1)
 	if ok {
-		fmt.Printf("Assertion failed at %s:%d", file, line)
+		fmt.Printf("Assertion failed at %s:%d\n", file, line)
 	} else {
-		fmt.Printf("Assertion failed at ?:?")
+		fmt.Printf("Assertion failed at ?:?\n")
 	}
 
 	for _, msg := range msgs {

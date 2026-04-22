@@ -10,7 +10,6 @@ import (
 )
 
 func init() {
-
 	err := config.Configure()
 	if err != nil {
 		panic(err)
@@ -24,10 +23,8 @@ func handelError(err error) {
 }
 
 func main() {
-
 	_, err := frappe.Login()
 	handelError(err)
-
 	r, err := kobo.GetAssetsExt[kobo.PGSNew](nil, 0, 1000)
 	handelError(err)
 	fmt.Println(len(r.Results))

@@ -15,7 +15,7 @@ func SyncPGS() {
 	items, errs := kobo.StreamAssets[kobo.PGSNew](nil)
 
 	for item := range items {
-		fmt.Println(item.AtHouseFarmId, "=>", item.ValidationStatus.Label)
+		fmt.Println(item.AtHouse.FarmId, "=>", item.ValidationStatus.Label)
 		count++
 	}
 

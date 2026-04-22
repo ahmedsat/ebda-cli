@@ -69,7 +69,7 @@ func GetEx[T FrappeDoctype](filters Filters, fields, expand List, restricted boo
 
 	req.URL.RawQuery = q.Encode()
 
-	resp, err := client.Do(req)
+	resp, err := Do(req)
 	if err != nil {
 		return
 	}
@@ -117,7 +117,7 @@ func Get1[T FrappeDoctype](id string) (result T, err error) {
 		return
 	}
 
-	resp, err := client.Do(req)
+	resp, err := Do(req)
 	if err != nil {
 		return
 	}
@@ -164,7 +164,7 @@ func Delete[T FrappeDoctype](id string) (err error) {
 		return
 	}
 
-	resp, err := client.Do(req)
+	resp, err := Do(req)
 	if err != nil {
 		return
 	}
@@ -209,7 +209,7 @@ func Create[T FrappeDoctype](data T) (result T, err error) {
 
 	req.Body = io.NopCloser(bytes.NewReader(jsonData))
 
-	resp, err := client.Do(req)
+	resp, err := Do(req)
 	if err != nil {
 		return
 	}
@@ -268,7 +268,7 @@ func UpdateDoc[T FrappeDoctype](doc T) (result T, err error) {
 
 	req.Body = io.NopCloser(bytes.NewReader(jsonData))
 
-	resp, err := client.Do(req)
+	resp, err := Do(req)
 	if err != nil {
 		return
 	}

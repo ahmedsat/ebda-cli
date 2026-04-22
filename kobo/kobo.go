@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ahmedsat/ebda-cli/config"
@@ -142,7 +144,6 @@ func GetAssetByID[T KoboAsset](id int) (result T, err error) {
 	}
 
 	decoder := json.NewDecoder(resp.Body)
-
 	// decoder.DisallowUnknownFields()
 
 	err = decoder.Decode(&result)
@@ -327,4 +328,38 @@ func Download(url string) (r io.ReadCloser, err error) {
 		return
 	}
 	return resp.Body, nil
+}
+
+func DownloadAttach(att Attachment) (localPath string, err error) {
+
+	localPath = att.Filename
+	// check if file exists
+	if utils.FileExists(localPath) {
+		return
+	}
+
+	// local dir
+	dir := filepath.Dir(localPath)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		return
+	}
+
+	f, err := os.Create(localPath)
+
+	req, err := http.NewRequest("GET", att.DownloadUrl, nil)
+	if err != nil {
+		return
+	}
+	resp, err := DoRequest(req)
+	if err != nil {
+		return
+	}
+
+	_, err = io.Copy(f, resp.Body)
+	if err != nil {
+		return
+	}
+	return
+
 }
