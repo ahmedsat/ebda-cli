@@ -17,3 +17,5 @@ farms.tsv
 workers.tsv
 commands/farms.tsv
 .codex
+ebda-cli
+codex

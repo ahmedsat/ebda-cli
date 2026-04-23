@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ahmedsat/ebda-cli/frappe"
-	"github.com/ahmedsat/ebda-cli/frappe/types"
+	"github.com/ahmedsat/ebda-cli/services"
 	"github.com/atotto/clipboard"
 )
 
@@ -33,50 +32,17 @@ func (t *Totals) Run(args []string) (err error) {
 		return
 	}
 
-	sb := strings.Builder{}
-	sb.WriteString("Region\tFarms\tFarmers\tArea\n")
-
-	region := map[string]struct {
-		farms   int
-		farmers int
-		area    float64
-	}{}
-
-	var (
-		totalFarms   int
-		totalFarmers int
-		totalArea    float64
-	)
-
-	// get all farms
-	farms, err := frappe.Get[types.Farm](
-		frappe.Filters{
-			frappe.NewFilter("type", frappe.Eq, "farm"),
-			frappe.NewFilter("farm_status", frappe.Neq, "Cancelled"),
-			frappe.NewFilter("creation_date", frappe.Gte, form.Format("2006-01-02")),
-			frappe.NewFilter("creation_date", frappe.Lte, to.AddDate(0, 0, 1).Format("2006-01-02")),
-		},
-		[]string{"name", "region", "total_farmers", "farm_area__feddan"}, nil)
+	report, err := services.LoadTotalsReport(form, to)
 	if err != nil {
 		return
 	}
 
-	for _, farm := range farms {
-		d := region[farm.Region]
-		d.farms++
-		totalFarms++
-		d.farmers += farm.TotalFarmers
-		totalFarmers += farm.TotalFarmers
-		d.area += farm.Area
-		totalArea += farm.Area
-		region[farm.Region] = d
+	sb := strings.Builder{}
+	sb.WriteString("Region\tFarms\tFarmers\tArea\n")
+	for _, row := range report.Rows {
+		fmt.Fprintf(&sb, "%s\t%d\t%d\t%.2f\n", row.Region, row.Farms, row.Farmers, row.Area)
 	}
-
-	for region, date := range region {
-		fmt.Fprintf(&sb, "%s\t%d\t%d\t%.2f\n", region, date.farms, date.farmers, date.area)
-	}
-
-	fmt.Fprintf(&sb, "Total\t%d\t%d\t%.2f\n", totalFarms, totalFarmers, totalArea)
+	fmt.Fprintf(&sb, "Total\t%d\t%d\t%.2f\n", report.TotalFarms, report.TotalFarmers, report.TotalArea)
 
 	if *copy {
 		clipboard.WriteAll(sb.String())

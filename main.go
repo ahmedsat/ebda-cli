@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ahmedsat/ebda-cli/commands"
+	"github.com/ahmedsat/ebda-cli/commands/gui"
 	"github.com/ahmedsat/ebda-cli/commands/training"
 	"github.com/ahmedsat/ebda-cli/commands/web"
 	"github.com/ahmedsat/ebda-cli/config"
@@ -38,6 +39,7 @@ func init() {
 		&commands.Info{},
 		&commands.Farm{},
 		&training.Training{},
+		&gui.Gui{},
 		&web.WebUi{},
 	)
 }
