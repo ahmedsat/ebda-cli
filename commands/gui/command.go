@@ -1,3 +1,5 @@
+//go:build !release && cgo
+
 package gui
 
 import (

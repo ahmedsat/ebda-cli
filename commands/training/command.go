@@ -93,6 +93,8 @@ func (t *Training) Run(args []string) (err error) {
 			return getData(args[1])
 		}
 		return getData("training.json")
+	case "data-tsv":
+		return getTsv()
 	case "filter":
 
 		if len(args) < 2 {
@@ -123,6 +125,51 @@ func (t *Training) Run(args []string) (err error) {
 		return errors.New("unavailable commands: " + args[0])
 	}
 
+}
+
+func getTsv() (err error) {
+	fmt.Fprintln(os.Stderr, "Fetching data...")
+	records, err := frappe.Get[types.EbdaTraining](nil, frappe.List{"name"}, nil)
+	if err != nil {
+		return err
+	}
+
+	runner := utils.NewSyncRunner(10, 100)
+
+	sb := strings.Builder{}
+	io := utils.SyncIoWriter{Writer: &sb}
+
+	fmt.Fprintln(&io, "Training Name\tFarm ID\tFarmer Name (EBDA Training farmers)")
+
+	c := atomic.Int64{}
+
+	for _, record := range records {
+		runner.Run(func() error {
+			fmt.Fprintf(os.Stderr, "\r%d/%d (%.2f%%)", c.Add(1), len(records), float64(c.Load())/float64(len(records))*100)
+			record, err := frappe.Get1[types.EbdaTraining](record.Name)
+			if err != nil {
+				return err
+			}
+			for _, farmer := range record.Farmers {
+				fmt.Fprintf(&io, "%s\t%s\t%s\n",
+					record.Topic,
+					record.FarmID,
+					farmer.FarmerName,
+				)
+			}
+			return nil
+		})
+	}
+
+	err = runner.Wait()
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(os.Stderr) // newline after progress
+	fmt.Println(sb.String())
+
+	return nil
 }
 
 func filter(opts []Opt) (result map[string]TrainingEntry, err error) {

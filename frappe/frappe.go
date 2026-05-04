@@ -26,6 +26,7 @@ var authMu sync.Mutex
 var authenticated bool
 
 func Do(req *http.Request) (*http.Response, error) {
+	// fmt.Println(req.URL)
 	if req == nil {
 		return nil, errors.New("nil request")
 	}

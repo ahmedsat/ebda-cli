@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 
 	"github.com/ahmedsat/ebda-cli/config"
-	"github.com/ahmedsat/ebda-cli/kobo"
+	"github.com/ahmedsat/ebda-cli/sheets"
 )
 
 func init() {
@@ -22,7 +23,14 @@ func handelError(err error) {
 }
 
 func main() {
-	r, err := kobo.GetAssetsExt[kobo.PGSNew](nil, 0, 1000)
-	handelError(err)
-	fmt.Println(len(r.Results))
+	// 11tXfIz9o_cgD-czMTQRRLF9JEkmvNTF5QSmdY6lVQFs
+	err := sheets.WriteRange(
+		context.Background(),
+		"11tXfIz9o_cgD-czMTQRRLF9JEkmvNTF5QSmdY6lVQFs",
+		"sheet1!A1",
+		[][]any{
+			{"hello", "world"},
+		},
+	)
+	fmt.Println(err)
 }

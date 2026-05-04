@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ahmedsat/ebda-cli/frappe/types"
 	"github.com/atotto/clipboard"
@@ -32,9 +33,23 @@ func (f *FollowUpCommand) Run(args []string) error {
 
 	fs := flag.NewFlagSet("follow-up", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
+	followUpFrom := fs.String("from", "1-1-2022", "Date part of ISO")
+	followUpTo := fs.String("to", time.Now().Format(utils.TimeLayout), "Date part of ISO")
 	fs.Parse(args)
 
-	results, err := frappe.Get[types.FarmFollowUp](nil, frappe.List{"name"}, nil)
+	from, err := time.Parse(utils.TimeLayout, *followUpFrom)
+	if err != nil {
+		return err
+	}
+	to, err := time.Parse(utils.TimeLayout, *followUpTo)
+	if err != nil {
+		return err
+	}
+
+	results, err := frappe.Get[types.FarmFollowUp](frappe.Filters{
+		frappe.NewFilter("visit_date", frappe.Gte, from.Format(time.DateOnly)),
+		frappe.NewFilter("visit_date", frappe.Lte, to.AddDate(0, 0, 1).Format(time.DateOnly)), // offset by 1 day to include the last day
+	}, frappe.List{"name"}, nil)
 	if err != nil {
 		return err
 	}
@@ -69,6 +84,7 @@ func (f *FollowUpCommand) Run(args []string) error {
 	fmt.Fprintln(&res, strings.Join([]string{
 		"ID",
 		"Farm Code",
+		"FollowerName",
 		"Rate",
 		"Issues",
 		"Visit Date",
@@ -81,6 +97,7 @@ func (f *FollowUpCommand) Run(args []string) error {
 		fmt.Fprintln(&res, strings.Join([]string{
 			result.Name,
 			result.FarmCode,
+			result.FollowerName,
 			fmt.Sprintf("%f", result.RatePercent),
 			strings.Join(result.Issues, " - "),
 			result.VisitDate,

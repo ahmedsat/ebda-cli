@@ -19,3 +19,7 @@ commands/farms.tsv
 .codex
 ebda-cli
 codex
+
+fyne-cross/
+data.tsv
+a.md

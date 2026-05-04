@@ -20,7 +20,31 @@ import (
 
 const MapOk = ""
 
-var exceptionMaps = []string{"EG/1247", "EG/1248", "EG/1249"}
+var exceptionMaps = []string{
+	"EG/1247",
+	"EG/1248",
+	"EG/1249",
+	"EG/570",
+	"EG/1974",
+	"EG/430",
+	"EG/431",
+	"EG/613",
+	"EG/429",
+	"EG/432",
+	"EG/292",
+	"EG/1589",
+	"EG/488",
+	"EG/836",
+	"EG/205",
+	"EG/2826",
+	"EG/193",
+	"EG/1590",
+	"EG/1129",
+	"EG/1125",
+	"EG/1591",
+	"EG/2413",
+	"EG/1262",
+}
 
 type output struct {
 	// target
@@ -38,7 +62,6 @@ type output struct {
 	issues           string
 	Map              string
 	hasSoil          bool
-	// rate             float64
 
 	// pgs
 	countOfPGS int
@@ -233,7 +256,7 @@ func (f *Farm) getFollowUps() (err error) {
 func (f *Farm) getPGSs() (err error) {
 	fmt.Fprintln(f.io, "getting PGSs data")
 	start := 0
-	res, err := kobo.GetAssetsExt[(kobo.PGSNew)](nil, 0, start)
+	res, err := kobo.GetAssetsExt[(kobo.PGSNew)](nil, 1000, start)
 	if err != nil {
 		return
 	}
@@ -245,7 +268,7 @@ func (f *Farm) getPGSs() (err error) {
 
 	for res.Next != "" {
 		start += len(res.Results)
-		res, err = kobo.GetAssetsExt[(kobo.PGSNew)](nil, 0, start)
+		res, err = kobo.GetAssetsExt[(kobo.PGSNew)](nil, 1000, start)
 		if err != nil {
 			return
 		}

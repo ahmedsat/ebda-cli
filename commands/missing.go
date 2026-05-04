@@ -96,17 +96,6 @@ func (m *Missing) Run(args []string) (err error) {
 		}
 	}
 
-	n, err := utils.NewProgressNotification(
-		"Handling Submissions",
-		fmt.Sprintf("Handled [%d:%d]", 0, len(data)),
-		"kobo-collect-handling-submissions",
-		0,
-	)
-	if err != nil {
-		panic(err)
-	}
-	n.Run()
-
 	runner := utils.NewSyncRunner(10, 100)
 	counter := 1
 	for _, d := range data {
@@ -118,16 +107,6 @@ func (m *Missing) Run(args []string) (err error) {
 					err = nil
 				}
 				config.DB.Save(&submissionState)
-				n, err := utils.NewProgressNotification(
-					"Handling Submissions",
-					fmt.Sprintf("Handled [%d:%d]", counter, len(data)),
-					"kobo-collect-handling-submissions",
-					int(float64(counter)/float64(len(data))*100),
-				)
-				if err != nil {
-					panic(err)
-				}
-				n.Run()
 				counter++
 			}()
 
@@ -148,7 +127,17 @@ func (m *Missing) Run(args []string) (err error) {
 				}
 			}
 
-			if d.Farm == "" {
+			if d.Code == "" {
+				fmt.Fprintf(file, "submission %d has no code\n", d.ID)
+				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusNotApproved)
+				if err != nil {
+					return
+				}
+				return
+			}
+
+			farms, err := frappe.Get[types.Farm](frappe.Filters{frappe.NewFilter("farm_id", frappe.Eq, d.Code)}, nil, nil)
+			if err != nil {
 				fmt.Fprintf(file, "submission %d has no farm\n", d.ID)
 				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusNotApproved)
 				if err != nil {
@@ -156,6 +145,26 @@ func (m *Missing) Run(args []string) (err error) {
 				}
 				return
 			}
+
+			if len(farms) == 0 {
+				fmt.Fprintf(file, "submission %d has no farm\n", d.ID)
+				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusNotApproved)
+				if err != nil {
+					return
+				}
+				return
+			}
+
+			if len(farms) > 1 {
+				fmt.Fprintf(file, "submission %d has multiple farms\n", d.ID)
+				_, err = kobo.UpdateValidationState[kobo.Collect](d.ID, kobo.ValidationStatusNotApproved)
+				if err != nil {
+					return
+				}
+				return
+			}
+
+			d.Farm = farms[0].Name
 
 			err = HandleSoil(&d, &submissionState)
 			if err != nil {
@@ -453,22 +462,16 @@ func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log 
 			return err
 		}
 
-		res, err := frappe.UploadFile(buf.Bytes(), fmt.Sprintf("face-%d-%d.png", collect.ID, num), func(sent, total int64) {
-
-			n, err := utils.NewProgressNotification(
-				"Uploading",
-				fmt.Sprintf("%d - [%d/%d]", collect.ID, i+1, len(collect.Farmers)),
-				fmt.Sprintf("uploading-to-erp-face-%d-%d.png", collect.ID, num),
-				int(float64(sent)/float64(total)*100),
-			)
-			if err != nil {
-				panic(err)
-			}
-			n.Run()
-		})
+		res, err := frappe.UploadFile(
+			buf.Bytes(),
+			fmt.Sprintf("face-%d-%d.png", collect.ID, num),
+			func(sent, total int64) {
+				fmt.Fprintf(os.Stderr, "\r[%d:%d]", sent, total)
+			})
 		if err != nil {
 			return err
 		}
+		fmt.Fprintln(os.Stderr)
 
 		if res.FileUrl == "" {
 			return fmt.Errorf("empty file url")
