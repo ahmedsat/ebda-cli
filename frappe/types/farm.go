@@ -41,6 +41,8 @@ type Farm struct {
 	LeadingEngineers    byte         `json:"leading_engineers"`
 	FarmName            string       `json:"farm_name"`
 	IsInternalFarm      byte         `json:"is_internal_farm"`
+	Latitude            string       `json:"latitude"`
+	Longitude           string       `json:"longitude"`
 	Workers             []FarmWorker `json:"workers"`
 }
 
