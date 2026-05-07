@@ -102,20 +102,22 @@ func (f *Farm) Run(args []string) (err error) {
 	fs := flag.NewFlagSet("farms", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
 	followUpFrom := fs.String("follow-up-from", "1-1-2022", "Date part of ISO")
-	followUpTo := fs.String("to", time.Now().Format(utils.TimeLayout), "Date part of ISO")
+	followUpTo := fs.String("follow-up-to", time.Now().Format(utils.TimeLayout), "Date part of ISO")
 	fs.Parse(args)
 
-	from, err := time.Parse(utils.TimeLayout, *followUpFrom)
-	if err != nil {
-		return
-	}
-	to, err := time.Parse(utils.TimeLayout, *followUpTo)
-	if err != nil {
-		return
-	}
+	{
+		followUpFrom, err := time.Parse(utils.TimeLayout, *followUpFrom)
+		if err != nil {
+			return err
+		}
+		followUpTo, err := time.Parse(utils.TimeLayout, *followUpTo)
+		if err != nil {
+			return err
+		}
 
-	f.followUpFrom = from
-	f.followUpTo = to
+		f.followUpFrom = followUpFrom
+		f.followUpTo = followUpTo
+	}
 
 	f.farmsMap = utils.NewLockableMap[string, int]()        //make(map[string]int)
 	f.applicationsMap = utils.NewLockableMap[string, int]() //make(map[string]int)

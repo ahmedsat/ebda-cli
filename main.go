@@ -41,6 +41,7 @@ func init() {
 		&training.Training{},
 		&gui.Gui{},
 		&web.WebUi{},
+		&commands.Update{},
 	)
 }
 

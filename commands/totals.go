@@ -3,10 +3,10 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ahmedsat/ebda-cli/services"
+	"github.com/ahmedsat/ebda-cli/utils"
 	"github.com/atotto/clipboard"
 )
 
@@ -18,6 +18,7 @@ const cliTimeFormat = "2-1-2006"
 func (t *Totals) Run(args []string) (err error) {
 	fs := flag.NewFlagSet("totals", flag.ExitOnError)
 	copy := fs.Bool("copy", false, "Copy to clipboard")
+	upload := fs.Bool("upload", false, "Upload to google sheet")
 	formStr := fs.String("from", "1-1-2022", "Date part of ISO")
 	toSt := fs.String("to", time.Now().Format(cliTimeFormat), "Date part of ISO")
 	fs.Parse(args)
@@ -37,19 +38,33 @@ func (t *Totals) Run(args []string) (err error) {
 		return
 	}
 
-	sb := strings.Builder{}
-	sb.WriteString("Region\tFarms\tFarmers\tArea\n")
+	tb := utils.NewTable("Region", "Farms", "Farmers", "Area")
 	for _, row := range report.Rows {
-		fmt.Fprintf(&sb, "%s\t%d\t%d\t%.2f\n", row.Region, row.Farms, row.Farmers, row.Area)
+		tb.AppendRow(row.Region, row.Farms, row.Farmers, row.Area)
 	}
-	fmt.Fprintf(&sb, "Total\t%d\t%d\t%.2f\n", report.TotalFarms, report.TotalFarmers, report.TotalArea)
+	tb.AppendRow("Total", report.TotalFarms, report.TotalFarmers, report.TotalArea)
+
+	if *upload {
+		err = tb.WriteToGoogleSheet(
+			"11tXfIz9o_cgD-czMTQRRLF9JEkmvNTF5QSmdY6lVQFs",
+			"sheet1!A1",
+		)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 
 	if *copy {
-		clipboard.WriteAll(sb.String())
+		clipboard.WriteAll(tb.TSV())
 		fmt.Println("copied to clipboard")
+	}
+
+	if *upload || *copy {
 		return
 	}
-	fmt.Print(sb.String())
+
+	fmt.Print(tb.TSV())
+
 	return
 }
 

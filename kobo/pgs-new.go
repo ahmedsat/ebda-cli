@@ -169,19 +169,6 @@ type GroupWb0zy95 struct {
 	GroupWb0zy95004                        string `json:"group_wb0zy95/__004"`
 }
 
-type Attachment struct {
-	DownloadUrl       string `json:"download_url"`
-	Mimetype          string `json:"mimetype"`
-	Filename          string `json:"filename"`
-	MediaFileBasename string `json:"media_file_basename"`
-	Uid               string `json:"uid"`
-	IsDeleted         bool   `json:"is_deleted"`
-	DownloadLargeUrl  string `json:"download_large_url"`
-	DownloadMediumUrl string `json:"download_medium_url"`
-	DownloadSmallUrl  string `json:"download_small_url"`
-	QuestionXpath     string `json:"question_xpath"`
-}
-
 type GroupPw9vq49 struct {
 	GroupPw9vq49IsThereAStore string `json:"group_pw9vq49/_Is_there_a_store"`
 	GroupPw9vq49072           string `json:"group_pw9vq49/__072"`

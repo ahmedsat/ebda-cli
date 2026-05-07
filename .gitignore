@@ -1,7 +1,5 @@
 
 test.sh
- 
-*.json
 *.csv
 *.kml
 
@@ -23,3 +21,4 @@ codex
 fyne-cross/
 data.tsv
 a.md
+services/auto-sheets.json

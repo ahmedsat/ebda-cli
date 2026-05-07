@@ -29,7 +29,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type SubmissionState struct {
+type SubmissionMissingState struct {
 	gorm.Model
 	FarmersDone  bool
 	SoilDone     bool
@@ -37,7 +37,7 @@ type SubmissionState struct {
 }
 
 func init() {
-	config.MigrationsList = append(config.MigrationsList, &SubmissionState{})
+	config.MigrationsList = append(config.MigrationsList, &SubmissionMissingState{})
 }
 
 type Missing struct {
@@ -100,7 +100,7 @@ func (m *Missing) Run(args []string) (err error) {
 	counter := 1
 	for _, d := range data {
 		runner.Run(func() (err error) {
-			var submissionState SubmissionState
+			var submissionState SubmissionMissingState
 			defer func() {
 				if err != nil {
 					fmt.Printf("%d\t%s\t%s\n", d.ID, d.Farm, err)
@@ -199,7 +199,7 @@ func (m *Missing) Run(args []string) (err error) {
 	return
 }
 
-func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) error {
+func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionMissingState) error {
 
 	if submissionState.BoundaryDone {
 		return nil
@@ -296,7 +296,7 @@ func HandleBoundary(collect *kobo.Collect, submissionState *SubmissionState) err
 	return nil
 }
 
-func HandleSoil(collect *kobo.Collect, submissionState *SubmissionState) error {
+func HandleSoil(collect *kobo.Collect, submissionState *SubmissionMissingState) error {
 
 	if submissionState.SoilDone {
 		return nil
@@ -340,7 +340,7 @@ func HandleSoil(collect *kobo.Collect, submissionState *SubmissionState) error {
 	return nil
 }
 
-func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionState, log io.Writer, no_farmer bool) error {
+func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionMissingState, log io.Writer, no_farmer bool) error {
 
 	if submissionState.FarmersDone {
 		return nil

@@ -38,7 +38,7 @@ func (m *MapRecord) Parse() error {
 	}
 
 	// ! the shitty implementation of this field makes it some time quoted despite being a float
-	// ! is have to do this shit to make it work
+	// ! i have to do this shit to make it work
 	m.Jsoncode = strings.ReplaceAll(m.Jsoncode, "\":\"", "\":")
 	m.Jsoncode = strings.ReplaceAll(m.Jsoncode, "\"}", "}")
 	m.Jsoncode = strings.ReplaceAll(m.Jsoncode, "\",\"", ",\"")
@@ -63,9 +63,13 @@ func (m *MapRecord) Parse() error {
 	// 	m.Name = fmt.Sprintf("%s - %s - %s", f.ArabicName, f.Region, f.FarmId)
 	// }
 
+	if m.Coordinates[0] != m.Coordinates[len(m.Coordinates)-1] {
+		m.Coordinates = append(m.Coordinates, m.Coordinates[0])
+	}
+
 	area, err := geo.Polygon{
-		Coords: m.Coordinates,
-	}.GeodesicArea()
+		Ring: m.Coordinates,
+	}.SphericalArea()
 	if err != nil {
 		return fmt.Errorf("%s: %s", m.Name, err)
 	}
