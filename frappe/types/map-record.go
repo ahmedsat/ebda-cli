@@ -14,7 +14,6 @@ import (
 
 type MapRecord struct {
 	Base
-	Name             string      `json:"name"`
 	ShapeID          string      `json:"shape_id"`
 	Type             string      `json:"type"`
 	NameOfShape      string      `json:"name_of_shape"`
