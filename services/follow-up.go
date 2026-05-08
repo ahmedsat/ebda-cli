@@ -1,8 +1,7 @@
 package services
 
 import (
-	"fmt"
-	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/ahmedsat/ebda-cli/frappe"
@@ -10,7 +9,14 @@ import (
 	"github.com/ahmedsat/ebda-cli/utils"
 )
 
-func LoadFollowUps(from time.Time, to time.Time) ([]types.FarmFollowUp, error) {
+func LoadFollowUps(from, to time.Time, onProgress func(int)) ([]types.FarmFollowUp, error) {
+
+	defer func() {
+		if onProgress != nil {
+			onProgress(100)
+		}
+	}()
+
 	results, err := frappe.Get[types.FarmFollowUp](frappe.Filters{
 		frappe.NewFilter("visit_date", frappe.Gte, from.Format(time.DateOnly)),
 		frappe.NewFilter("visit_date", frappe.Lte, to.AddDate(0, 0, 1).Format(time.DateOnly)), // offset by 1 day to include the last day
@@ -19,22 +25,21 @@ func LoadFollowUps(from time.Time, to time.Time) ([]types.FarmFollowUp, error) {
 		return nil, err
 	}
 
-	fmt.Fprintln(os.Stderr, "Calculating rates...")
-	counter := 1
-	s := utils.NewSyncRunner(10, 0)
+	c := atomic.Int64{}
+	s := utils.NewSyncRunner(10, 100)
 	for i := range results {
 		s.Run(func() (err error) {
 			err = results[i].Rate()
 			if err != nil {
 				return
 			}
-			fmt.Fprintf(os.Stderr, "\r%d/%d (%.2f%%)", counter, len(results), float64(counter)/float64(len(results))*100)
-			counter++
+			if onProgress != nil {
+				onProgress(int(float64(c.Add(1)) / float64(len(results)) * 100))
+			}
 			return
 		})
 	}
 	err = s.Wait()
-	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return nil, err
 	}

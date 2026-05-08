@@ -55,7 +55,9 @@ func (f *FollowUpCommand) Run(args []string) error {
 		return err
 	}
 
-	results, err := services.LoadFollowUps(from, to)
+	results, err := services.LoadFollowUps(from, to, func(i int) {
+		fmt.Fprintf(os.Stderr, "\r%d%%", i)
+	})
 	if err != nil {
 		return err
 	}

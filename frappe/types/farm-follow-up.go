@@ -225,12 +225,12 @@ func (f *FarmFollowUp) Rate() error {
 
 		// time diff
 		if visitDate.Sub(creation) > permissibleTimeDiff {
-			checks = append(checks, utils.Check{Name: "تلاعب بتاريخ الزيارة", Ok: false, Weight: 0})
+			checks = append(checks, utils.Check{Name: "تلاعب بتاريخ الزيارة", Ok: false, Weight: 1})
 		}
 
 		// time diff
 		if creation.Sub(visitDate) > permissibleTimeDiff {
-			checks = append(checks, utils.Check{Name: "تلاعب بتاريخ الزيارة", Ok: false, Weight: 0})
+			checks = append(checks, utils.Check{Name: "تلاعب بتاريخ الزيارة", Ok: false, Weight: 1})
 		}
 	}
 
