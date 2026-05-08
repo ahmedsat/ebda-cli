@@ -68,12 +68,6 @@ type SyncIoWriter struct {
 	io.Writer
 }
 
-func NewLockableMap[K comparable, V any]() LockableMap[K, V] {
-	return LockableMap[K, V]{
-		Map: make(map[K]V),
-	}
-}
-
 func (w *SyncIoWriter) Write(b []byte) (int, error) {
 	w.Lock()
 	defer w.Unlock()
@@ -83,6 +77,12 @@ func (w *SyncIoWriter) Write(b []byte) (int, error) {
 type LockableMap[K comparable, V any] struct {
 	sync.RWMutex
 	Map map[K]V
+}
+
+func NewLockableMap[K comparable, V any]() LockableMap[K, V] {
+	return LockableMap[K, V]{
+		Map: make(map[K]V),
+	}
 }
 
 func (m *LockableMap[K, V]) Lock() {
@@ -95,4 +95,16 @@ func (m *LockableMap[K, V]) Unlock() {
 
 func (m *LockableMap[K, V]) TryLock() bool {
 	return m.RWMutex.TryLock()
+}
+
+func (m *LockableMap[K, V]) RLock() {
+	m.RWMutex.RLock()
+}
+
+func (m *LockableMap[K, V]) RUnlock() {
+	m.RWMutex.RUnlock()
+}
+
+func (m *LockableMap[K, V]) TryRLock() bool {
+	return m.RWMutex.TryRLock()
 }

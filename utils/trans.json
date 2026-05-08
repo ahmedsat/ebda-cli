@@ -28,5 +28,7 @@
   "Region": "المنطقة",
   "Farms Count": "عدد المزارع",
   "Farmers Count": "عدد المزارعين",
-  "Area Feddan": "المساحة بالفدان"
+  "Area Feddan": "المساحة بالفدان",
+  "Area is %0.2f fed, should be %0.2f fed": "المساحة %0.2f فدان، يجب ان تكون %0.2f فدان",
+  "Overlapped with %s by %0.2f fed": "متداخلة مع %s بمساحة %0.2f فدان"
 }
