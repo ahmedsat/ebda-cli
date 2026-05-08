@@ -82,22 +82,22 @@ func GetAssets[T KoboAsset](query Query) (result []T, err error) {
 	return
 }
 
-func StreamAssets[T KoboAsset](query Query) (<-chan T, <-chan error) {
+func StreamAssets[T KoboAsset](query Query) (int, <-chan T, <-chan error) {
 	out := make(chan T)
 	errCh := make(chan error, 1) // buffered to avoid goroutine leak
+
+	start := 0
+	res, err := GetAssetsExt[T](query, 0, start)
+	if err != nil {
+		defer close(out)
+		defer close(errCh)
+		errCh <- err
+		return 0, out, errCh
+	}
 
 	go func() {
 		defer close(out)
 		defer close(errCh)
-
-		start := 0
-
-		res, err := GetAssetsExt[T](query, 0, start)
-		if err != nil {
-			errCh <- err
-			return
-		}
-
 		for {
 			for _, item := range res.Results {
 				out <- item
@@ -109,6 +109,7 @@ func StreamAssets[T KoboAsset](query Query) (<-chan T, <-chan error) {
 
 			start += len(res.Results)
 
+			var err error
 			res, err = GetAssetsExt[T](query, 0, start)
 			if err != nil {
 				errCh <- err
@@ -117,7 +118,7 @@ func StreamAssets[T KoboAsset](query Query) (<-chan T, <-chan error) {
 		}
 	}()
 
-	return out, errCh
+	return res.Count, out, errCh
 }
 
 func GetAssetByID[T KoboAsset](id int) (result T, err error) {

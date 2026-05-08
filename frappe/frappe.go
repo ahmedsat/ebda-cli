@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ahmedsat/ebda-cli/config"
 	"github.com/ahmedsat/ebda-cli/utils"
@@ -76,7 +77,8 @@ func init() {
 		return
 	}
 	client = &http.Client{
-		Jar: jar,
+		Jar:     jar,
+		Timeout: 5 * time.Minute,
 	}
 }
 

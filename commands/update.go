@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,9 +15,13 @@ import (
 
 	"github.com/ahmedsat/ebda-cli/frappe"
 	"github.com/ahmedsat/ebda-cli/frappe/types"
+	"github.com/ahmedsat/ebda-cli/geo"
 	"github.com/ahmedsat/ebda-cli/kobo"
 	"github.com/ahmedsat/ebda-cli/services"
 	"github.com/ahmedsat/ebda-cli/utils"
+	"github.com/gen2brain/beeep"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 const (
@@ -40,11 +46,17 @@ type Update struct {
 	FollowUpFrom time.Time
 	FollowUpTo   time.Time
 
+	MapOverlapTolerance float64
+	MapAreaTolerance    float64
+
 	*utils.SyncRunner
 	*services.Sheet
 
 	errMu sync.Mutex
 	errs  [][]any
+
+	progress *mpb.Progress
+	wg       sync.WaitGroup
 }
 
 func (u *Update) logErr(where string, err error) {
@@ -124,6 +136,16 @@ func (u *Update) Configure() error {
 			u.FollowUpFrom, err = time.Parse(utils.TimeLayout, row[1].(string))
 		case "follow-up-to":
 			u.FollowUpTo, err = time.Parse(utils.TimeLayout, row[1].(string))
+		case "map-overlap-tolerance":
+			u.MapOverlapTolerance, err = strconv.ParseFloat(row[1].(string), 64)
+			if err == nil {
+				u.MapOverlapTolerance *= 4200
+			}
+		case "map-area-tolerance":
+			u.MapAreaTolerance, err = strconv.ParseFloat(row[1].(string), 64)
+			if err == nil {
+				u.MapAreaTolerance *= 4200
+			}
 		default:
 			fmt.Fprintf(os.Stderr, "unknown config key: %s\n", row[0])
 			continue
@@ -139,21 +161,62 @@ func (u *Update) Configure() error {
 func (u *Update) Description() string { panic("unimplemented") }
 func (u *Update) Name() string        { return "update" }
 
+func (u *Update) runWithBar(name string, fn func() error) {
+	u.wg.Add(1)
+
+	bar := u.progress.AddSpinner(1,
+		mpb.PrependDecorators(decor.Name(name+": ")),
+		mpb.AppendDecorators(
+			decor.OnAbort(decor.OnComplete(decor.Name("running"), "done"), "failed"),
+		),
+	)
+
+	go func() {
+		defer u.wg.Done()
+
+		err := func() (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("panic: %v\n%s", r, string(debug.Stack()))
+				}
+			}()
+			return fn()
+		}()
+
+		if err != nil {
+			u.logErr(name, err)
+			bar.Abort(false) // shows failed state
+			return
+		}
+
+		bar.Increment() // shows done
+	}()
+}
+
+func (u *Update) runJob(name string, fn func() error) {
+	u.wg.Go(func() {
+		_ = u.guard(name, fn)()
+	})
+}
+
 func (u *Update) Run(args []string) error {
+	defer beeep.Alert("ebda-cli", "ebda-cli is done", nil)
+
 	if err := u.Configure(); err != nil {
 		return err
 	}
 
-	// wrap all jobs
-	// u.SyncRunner.Run(u.guard("NewFarms", u.NewFarms))
-	// u.SyncRunner.Run(u.guard("FollowUp", u.FollowUp))
-	// u.SyncRunner.Run(u.guard("PGS", u.PGS))
-	u.SyncRunner.Run(u.guard("Maps", u.Maps))
-	// u.SyncRunner.Run(u.guard("Soils", u.Soils))
+	u.progress = mpb.New()
 
-	_ = u.Wait() // never fail whole run
+	u.runWithBar("NewFarms", u.NewFarms)
+	u.runWithBar("Soils", u.Soils)
+	u.runJob("FollowUp", u.FollowUp)
+	u.runJob("PGS", u.PGS)
+	u.runJob("Maps", u.Maps)
 
-	// single sheet write for all errors
+	u.wg.Wait()
+	u.progress.Shutdown()
+
 	return u.flushErrors()
 }
 
@@ -178,13 +241,41 @@ func (u *Update) NewFarms() error {
 	return u.ClearAndUpdateRange(context.Background(), farmsRange, values)
 }
 
-func (u *Update) FollowUp() error {
+func (u *Update) FollowUp() (err error) {
 
 	values := [][]any{
 		{"Visit ID", "Farm Code", "Visit Date", "Creation", "Rate", "Issues"},
 	}
 
-	followUps, err := services.LoadFollowUps(u.FollowUpFrom, u.FollowUpTo)
+	bar := u.progress.AddBar(100,
+		mpb.PrependDecorators(
+			decor.Name("FollowUp: "),
+			decor.Percentage(),
+		),
+	)
+
+	progressCh := make(chan int, 1000)
+	done := make(chan struct{})
+
+	go func() {
+		for n := range progressCh {
+			bar.SetCurrent(int64(n))
+		}
+		defer close(done)
+	}()
+	defer func() {
+		close(progressCh)
+		<-done
+		if err != nil {
+			bar.Abort(true)
+			return
+		}
+		bar.SetTotal(100, true)
+	}()
+
+	followUps, err := services.LoadFollowUps(u.FollowUpFrom, u.FollowUpTo, func(n int) {
+		progressCh <- n
+	})
 	if err != nil {
 		return err
 	}
@@ -203,7 +294,7 @@ func (u *Update) FollowUp() error {
 	return u.ClearAndUpdateRange(context.Background(), followUpRange, values)
 }
 
-func (u *Update) PGS() error {
+func (u *Update) PGS() (err error) {
 	ctx := context.Background()
 
 	names, err := u.ReadRange(ctx, fixNamesRange)
@@ -223,36 +314,62 @@ func (u *Update) PGS() error {
 		return err
 	}
 
-	values := [][]any{
-		{"Submission ID", "Date", "Farms Code", "Validation Status", "Engineer"},
-	}
+	header := []any{"Submission ID", "Date", "Farms Code", "Validation Status", "Engineer"}
 
-	dataCh, errCh := kobo.StreamAssets[kobo.PGSNew](nil)
+	total, dataCh, errCh := kobo.StreamAssets[kobo.PGSNew](nil)
+
+	bar := u.progress.AddBar(int64(total),
+		mpb.PrependDecorators(
+			decor.Name("PGS: "),
+			decor.Percentage(),
+		),
+	)
+
+	progressCh := make(chan struct{}, 1000)
+	done := make(chan struct{})
+
+	// UI updater
+	go func() {
+		for range progressCh {
+			bar.Increment()
+		}
+		close(done)
+	}()
+	defer func() {
+		close(progressCh)
+		<-done
+		if err != nil {
+			bar.Abort(true)
+			return
+		}
+		bar.SetTotal(int64(total), true)
+	}()
 
 	missingSet := make(map[string]struct{})
-	processed := 0
 
-	for {
+	// batching
+	batch := make([][]any, 0, 100)
+
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		err := u.Append(ctx, pgsRange, batch)
+		batch = batch[:0]
+		return err
+	}
+
+	// write header once
+	if err := u.Append(ctx, pgsRange, [][]any{header}); err != nil {
+		return err
+	}
+
+	for dataCh != nil || errCh != nil {
 		select {
 		case audit, ok := <-dataCh:
 			if !ok {
-				if len(values) > 1 {
-					if err := u.Append(ctx, pgsRange, values[1:]); err != nil {
-						return err
-					}
-				}
-
-				if len(missingSet) > 0 {
-					toAppend := make([][]any, 0, len(missingSet))
-					for name := range missingSet {
-						toAppend = append(toAppend, []any{name})
-					}
-					if err := u.Append(ctx, fixNamesRange, toAppend); err != nil {
-						return err
-					}
-				}
-
-				return nil
+				dataCh = nil
+				continue
 			}
 
 			row := []any{
@@ -269,85 +386,259 @@ func (u *Update) PGS() error {
 				missingSet[audit.EngineerData.EngineerName] = struct{}{}
 			}
 
-			values = append(values, row)
-			processed++
+			batch = append(batch, row)
 
-			if processed%50 == 0 {
-				log.Printf("PGS processed: %d", processed)
+			progressCh <- struct{}{}
+
+			if len(batch) >= 100 {
+				if err := flush(); err != nil {
+					return err
+				}
 			}
 
-		case err := <-errCh:
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+				continue
+			}
 			if err != nil {
 				return err
 			}
 		}
 	}
+
+	// final flush
+	if err := flush(); err != nil {
+		return err
+	}
+
+	// missing names
+	if len(missingSet) > 0 {
+		toAppend := make([][]any, 0, len(missingSet))
+		for name := range missingSet {
+			toAppend = append(toAppend, []any{name})
+		}
+		if err := u.Append(ctx, fixNamesRange, toAppend); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (u *Update) Maps() error {
+type MapData struct {
+	Name     string
+	FarmID   string
+	Area     float64
+	MapsIds  []string
+	Polygons []geo.Polygon
+}
+
+func (md MapData) Overlapped(other MapData) (float64, error) {
+
+	for _, p1 := range md.Polygons {
+		for _, p2 := range other.Polygons {
+			area, err := p1.OverlapArea(p2)
+			if err != nil {
+				return 0, err
+			}
+			if area > 0 {
+				return area, nil
+			}
+		}
+	}
+
+	return 0, nil
+}
+
+func (u *Update) Maps() (err error) {
 	mapsList, err := frappe.Get[types.MapRecord](nil, nil, nil)
 	if err != nil {
 		u.logErr("Maps", err)
 		return err
 	}
 
-	MapsMap := make(map[string][]types.MapRecord)
-	for i := range mapsList {
-		err := mapsList[i].Parse()
+	bar := u.progress.AddBar(int64(len(mapsList)),
+		mpb.PrependDecorators(
+			decor.Name("Maps (build): "),
+			decor.Percentage(),
+		),
+	)
+
+	progressCh := make(chan struct{}, 1000)
+	done := make(chan struct{})
+
+	go func() {
+		for range progressCh {
+			bar.Increment()
+		}
+		close(done)
+	}()
+	buildBarClosed := false
+	finishBuildBar := func() {
+		if buildBarClosed {
+			return
+		}
+		buildBarClosed = true
+		close(progressCh)
+		<-done
 		if err != nil {
-			u.logErr("Maps", err)
+			bar.Abort(true)
+			return
 		}
-		m := mapsList[i]
-		if m.Farm == "" {
-			continue
-		}
-
-		MapsMap[m.Farm] = append(MapsMap[m.Farm], m)
+		bar.SetTotal(int64(len(mapsList)), true)
 	}
+	defer finishBuildBar()
 
-	mapsList = []types.MapRecord{}
-	mapsListMut := sync.Mutex{}
-	runner := utils.NewSyncRunner(50, 100)
-
+	MapsMap := utils.NewLockableMap[string, MapData]()
+	runner := utils.NewSyncRunner(10, 100)
 	c := atomic.Int64{}
-	for farm, maps := range MapsMap {
+	for _, m := range mapsList {
 		runner.Run(func() error {
-			defer fmt.Printf("\r[%d:%d]", c.Add(1), len(MapsMap))
-			farm, err := frappe.Get1[types.Farm](farm)
-			if err != nil {
-				u.logErr("Maps", err)
+			defer func() { progressCh <- struct{}{} }()
+			if m.Farm == "" {
 				return nil
 			}
 
-			if len(maps) > 1 {
-				u.logErr("Maps", fmt.Errorf("Farm (%s) has more than one Map (%d)", farm.FarmId, len(maps)))
+			err := m.Parse()
+			if err != nil {
+				return err
 			}
 
-			m := types.MapRecord{}
-			for _, m_ := range maps {
-				// m.Area_in_feddan += m_.Area_in_feddan
-				if m_.Area_in_feddan > m.Area_in_feddan {
-					m = m_
+			MapsMap.RLock()
+			data, ok := MapsMap.Map[m.Farm]
+			MapsMap.RUnlock()
+			if !ok {
+				farm, err := frappe.Get1[types.Farm](m.Farm)
+				if err != nil {
+					return err
 				}
+				data = MapData{
+					Name:     farm.ArabicName,
+					FarmID:   farm.FarmId,
+					MapsIds:  []string{m.Name},
+					Area:     farm.Area * 4200,
+					Polygons: []geo.Polygon{{Ring: m.Coordinates}},
+				}
+				MapsMap.Lock()
+				MapsMap.Map[m.Farm] = data
+				MapsMap.Unlock()
+			} else {
+				data.MapsIds = append(data.MapsIds, m.Name)
+				for j, poly := range data.Polygons {
+					polys, err := poly.Union(geo.Polygon{Ring: m.Coordinates})
+					if err != nil {
+						return err
+					}
+					if len(polys) == 1 {
+						data.Polygons[j] = polys[0]
+						break
+					}
+				}
+				data.Polygons = append(data.Polygons, geo.Polygon{Ring: m.Coordinates})
 			}
-			m.Farm = farm.FarmId
-			mapsListMut.Lock()
-			mapsList = append(mapsList, m)
-			mapsListMut.Unlock()
+
+			MapsMap.Lock()
+			MapsMap.Map[m.Farm] = data
+			MapsMap.Unlock()
 			return nil
 		})
 	}
-	err = runner.Wait()
-	if err != nil {
-		u.logErr("Maps", err)
-	}
-	fmt.Println()
 
-	values := [][]any{{"Name", "Farm", "Area"}}
-	for _, mapRecord := range mapsList {
-		row := []any{mapRecord.Name, mapRecord.Farm, mapRecord.Area_in_feddan}
-		values = append(values, row)
+	if err := runner.Wait(); err != nil {
+		return err
 	}
+	finishBuildBar()
+
+	bar2 := u.progress.AddBar(int64(len(MapsMap.Map)),
+		mpb.PrependDecorators(
+			decor.Name("Maps (validate): "),
+			decor.Percentage(),
+		),
+	)
+	progressCh2 := make(chan struct{}, 1000)
+	done2 := make(chan struct{})
+
+	go func() {
+		for range progressCh2 {
+			bar2.Increment()
+		}
+		close(done2)
+	}()
+	validateBarClosed := false
+	finishValidateBar := func() {
+		if validateBarClosed {
+			return
+		}
+		validateBarClosed = true
+		close(progressCh2)
+		<-done2
+		if err != nil {
+			bar2.Abort(true)
+			return
+		}
+		bar2.SetTotal(int64(len(MapsMap.Map)), true)
+	}
+	defer finishValidateBar()
+
+	values := [][]any{{"Code", "Issues"}}
+	mut := sync.Mutex{}
+
+	c.Store(0)
+	for _, data := range MapsMap.Map {
+		runner.Run(func() error {
+			defer func() { progressCh2 <- struct{}{} }()
+			row := []any{data.FarmID}
+			if len(data.MapsIds) == 0 {
+				row = append(row, "No maps")
+				mut.Lock()
+				values = append(values, row)
+				mut.Unlock()
+				return nil
+			}
+
+			issues := []string{}
+			totalArea := 0.0
+			for _, poly := range data.Polygons {
+				area, err := poly.SphericalArea()
+				if err != nil {
+					u.logErr("Maps", err)
+					continue
+				}
+				totalArea += area
+			}
+
+			if math.Abs(data.Area-totalArea) > u.MapAreaTolerance {
+				issues = append(issues, fmt.Sprintf(utils.Trans("Area is %0.2f fed, should be %0.2f fed"), totalArea/4200, data.Area/4200))
+			}
+
+			for _, v := range MapsMap.Map {
+				if v.FarmID == data.FarmID {
+					continue
+				}
+				overlapped, err := data.Overlapped(v)
+				if err != nil {
+					u.logErr("Maps", err)
+					continue
+				}
+				if overlapped > u.MapOverlapTolerance {
+					issues = append(issues, fmt.Sprintf(utils.Trans("Overlapped with %s by %0.2f fed"), v.Name, overlapped/4200))
+				}
+			}
+
+			row = append(row, strings.Join(issues, "\n"))
+			mut.Lock()
+			values = append(values, row)
+			mut.Unlock()
+			return nil
+		})
+	}
+
+	if err := runner.Wait(); err != nil {
+		u.logErr("Maps", err)
+		return err
+	}
+	finishValidateBar()
 
 	err = u.ClearAndUpdateRange(context.Background(), mapsRange, values)
 	if err != nil {
