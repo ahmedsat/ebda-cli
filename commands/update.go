@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"math"
@@ -202,17 +203,35 @@ func (u *Update) runJob(name string, fn func() error) {
 func (u *Update) Run(args []string) error {
 	defer beeep.Alert("ebda-cli", "ebda-cli is done", nil)
 
+	fs := flag.NewFlagSet("update", flag.ExitOnError)
+	skipNewFarms := fs.Bool("skip-new-farms", false, "Skip updating new farms totals")
+	skipFollowUp := fs.Bool("skip-follow-up", false, "Skip updating follow-up audits")
+	skipPGS := fs.Bool("skip-pgs", false, "Skip updating PGS audits")
+	skipSoils := fs.Bool("skip-soils", false, "Skip updating soil analysis")
+	skipMaps := fs.Bool("skip-maps", false, "Skip updating map validation")
+	fs.Parse(args)
+
 	if err := u.Configure(); err != nil {
 		return err
 	}
 
 	u.progress = mpb.New()
 
-	u.runWithBar("NewFarms", u.NewFarms)
-	u.runWithBar("Soils", u.Soils)
-	u.runJob("FollowUp", u.FollowUp)
-	u.runJob("PGS", u.PGS)
-	u.runJob("Maps", u.Maps)
+	if !*skipNewFarms {
+		u.runWithBar("NewFarms", u.NewFarms)
+	}
+	if !*skipSoils {
+		u.runWithBar("Soils", u.Soils)
+	}
+	if !*skipFollowUp {
+		u.runJob("FollowUp", u.FollowUp)
+	}
+	if !*skipPGS {
+		u.runJob("PGS", u.PGS)
+	}
+	if !*skipMaps {
+		u.runJob("Maps", u.Maps)
+	}
 
 	u.wg.Wait()
 	u.progress.Shutdown()
