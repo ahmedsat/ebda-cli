@@ -12,7 +12,7 @@ var (
 )
 
 func SyncPGS() {
-	items, errs := kobo.StreamAssets[kobo.PGSNew](nil)
+	_, items, errs := kobo.StreamAssets[kobo.PGSNew](nil)
 
 	for item := range items {
 		fmt.Println(item.AtHouse.FarmId, "=>", item.ValidationStatus.Label)
