@@ -11,5 +11,6 @@ func init() {
 		&commands.Missing{},
 		&commands.Debug{},
 		&commands.VisitsPlan{},
+		&commands.FollowUpCommand{},
 	)
 }

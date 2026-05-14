@@ -419,7 +419,7 @@ func (f *Farm) getFarms() (err error) {
 		f.codesMap.Map[f.farms[i].FarmId] = i
 
 		f.applicationsMap.Lock()
-		app := f.applicationsMap.Map[f.farms[i].FarmApplication]
+		app := f.applicationsMap.Map[f.farms[i].FarmApplicationID]
 
 		f.outputMap.Lock()
 		output := f.outputMap.Map[f.farms[i].FarmId]

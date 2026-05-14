@@ -69,24 +69,52 @@ func ToPascalCase(s string) string {
 	}
 
 	var result []rune
+	var token []rune
 	var capitalizeNext = true
+
+	flushToken := func() {
+		if len(token) == 0 {
+			return
+		}
+
+		result = append(result, unicode.ToUpper(token[0]))
+		if isAllUpper(token[1:]) {
+			for _, r := range token[1:] {
+				result = append(result, unicode.ToLower(r))
+			}
+		} else {
+			result = append(result, token[1:]...)
+		}
+
+		token = token[:0]
+	}
 
 	for _, r := range s {
 		switch {
 		case r == '_' || r == '-' || r == ' ' || r == ':' || r == '(' || r == ')' || r == '/':
+			flushToken()
 			capitalizeNext = true
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
 			if capitalizeNext {
-				result = append(result, unicode.ToUpper(r))
 				capitalizeNext = false
-			} else {
-				result = append(result, unicode.ToLower(r))
 			}
+			token = append(token, r)
 		default:
+			flushToken()
 			// skip other symbols
 			capitalizeNext = true
 		}
 	}
+	flushToken()
 
 	return string(result)
+}
+
+func isAllUpper(rs []rune) bool {
+	for _, r := range rs {
+		if unicode.IsLetter(r) && unicode.IsLower(r) {
+			return false
+		}
+	}
+	return true
 }

@@ -156,6 +156,8 @@ func (u *Update) Configure() error {
 		}
 	}
 
+	u.progress = mpb.New()
+
 	return nil
 }
 
@@ -215,8 +217,6 @@ func (u *Update) Run(args []string) error {
 		return err
 	}
 
-	u.progress = mpb.New()
-
 	if !*skipNewFarms {
 		u.runWithBar("NewFarms", u.NewFarms)
 	}
@@ -242,22 +242,82 @@ func (u *Update) Run(args []string) error {
 func (u *Update) Usage() string { panic("unimplemented") }
 
 func (u *Update) NewFarms() error {
-	values := [][]any{
-		{utils.Trans("Region"), utils.Trans("Farms Count"), utils.Trans("Farmers Count"), utils.Trans("Area Feddan")},
-	}
 
-	report, err := services.LoadTotalsReport(u.NewFarmsFrom, u.NewFarmsTo)
+	ctx := context.Background()
+
+	names, err := u.ReadRange(ctx, fixNamesRange)
 	if err != nil {
 		return err
 	}
 
-	for _, row := range report.Rows {
-		values = append(values, []any{utils.Trans(row.Region), row.Farms, row.Farmers, row.Area})
+	namesMap := make(map[string]string)
+	for _, name := range names {
+		if len(name) < 2 {
+			continue
+		}
+		namesMap[name[0].(string)] = name[1].(string)
 	}
 
-	values = append(values, []any{utils.Trans("Total"), report.TotalFarms, report.TotalFarmers, report.TotalArea})
+	values := [][]any{
+		{
+			utils.Trans("Farm Name"),
+			utils.Trans("Region"),
+			utils.Trans("Farm Code"),
+			utils.Trans("Farmers Count"),
+			utils.Trans("Area Feddan"),
+			utils.Trans("Engineer Name")},
+	}
 
-	return u.ClearAndUpdateRange(context.Background(), farmsRange, values)
+	farms, err := frappe.Get[types.Farm](frappe.Filters{
+		frappe.NewFilter("type", frappe.Eq, "farm"),
+		frappe.NewFilter("farm_status", frappe.Neq, "Cancelled"),
+		frappe.NewFilter("creation_date", frappe.Gte, u.NewFarmsFrom.Format("2006-01-02")),
+		frappe.NewFilter("creation_date", frappe.Lte, u.NewFarmsTo.AddDate(0, 0, 1).Format("2006-01-02")),
+	},
+		[]string{"name", "arabic_name", "region", "farm_id", "total_farmers", "farm_area__feddan", "farm_application"}, nil)
+	if err != nil {
+		return err
+	}
+
+	missingSet := make(map[string]struct{})
+	for _, farm := range farms {
+		app, err := frappe.Get1[types.FarmApplication](farm.FarmApplicationID)
+		if err != nil {
+			return err
+		}
+
+		engName, ok := namesMap[app.EngineerName]
+		if !ok {
+			missingSet[app.EngineerName] = struct{}{}
+		}
+
+		values = append(values, []any{
+			farm.ArabicName,
+			utils.Trans(farm.Region),
+			farm.FarmId,
+			farm.TotalFarmers,
+			farm.Area,
+			engName,
+		})
+	}
+
+	err = u.ClearAndUpdateRange(context.Background(), farmsRange, values)
+	if err != nil {
+		return err
+	}
+
+	// missing names
+	if len(missingSet) > 0 {
+		toAppend := make([][]any, 0, len(missingSet))
+		for name := range missingSet {
+			toAppend = append(toAppend, []any{name})
+		}
+		if err := u.Append(ctx, fixNamesRange, toAppend); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (u *Update) FollowUp() (err error) {
@@ -529,6 +589,9 @@ func (u *Update) Maps() (err error) {
 			MapsMap.RUnlock()
 			if !ok {
 				farm, err := frappe.Get1[types.Farm](m.Farm)
+				if farm.FarmStatus == "Cancelled" {
+					return nil
+				}
 				if err != nil {
 					return err
 				}
@@ -641,7 +704,7 @@ func (u *Update) Maps() (err error) {
 					continue
 				}
 				if overlapped > u.MapOverlapTolerance {
-					issues = append(issues, fmt.Sprintf(utils.Trans("Overlapped with %s by %0.2f fed"), v.Name, overlapped/4200))
+					issues = append(issues, fmt.Sprintf(utils.Trans("Overlapped with %s (%s) by %0.2f fed"), v.Name, v.FarmID, overlapped/4200))
 				}
 			}
 

@@ -31,7 +31,7 @@ type Farm struct {
 	FarmOwner           string       `json:"farm_owner"`
 	Area                float64      `json:"farm_area__feddan"`
 	CreationDate        string       `json:"creation_date"`
-	FarmApplication     string       `json:"farm_application"`
+	FarmApplicationID   string       `json:"farm_application"`
 	Type                string       `json:"type"`
 	IsPlotOfSector      byte         `json:"is_plot_of_sector"`
 	UpscalingProject    string       `json:"upscaling_project"`
@@ -43,6 +43,7 @@ type Farm struct {
 	IsInternalFarm      byte         `json:"is_internal_farm"`
 	Latitude            string       `json:"latitude"`
 	Longitude           string       `json:"longitude"`
+	FarmStatus          string       `json:"farm_status"`
 	Workers             []FarmWorker `json:"workers"`
 }
 

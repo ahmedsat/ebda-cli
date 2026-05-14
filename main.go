@@ -32,7 +32,6 @@ func init() {
 	AddSubCommand(
 		&HelpCommand{},
 		&commands.Totals{},
-		&commands.FollowUpCommand{},
 		&commands.Pgs{},
 		&commands.Map{},
 		&commands.Soil{},
