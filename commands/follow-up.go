@@ -152,7 +152,7 @@ func migrateFollowUp() error {
 
 		var followUp types.FarmFollowUp
 		if state.FormIDOnFrappe != "" {
-			followUp, err = frappe.Get1[types.FarmFollowUp](state.FormIDOnFrappe)
+			followUp, err = frappe.GetCached1[types.FarmFollowUp](state.FormIDOnFrappe)
 			if err != nil {
 				return err
 			}

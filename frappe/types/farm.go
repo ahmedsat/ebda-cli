@@ -1,6 +1,11 @@
 package types
 
-import "github.com/ahmedsat/ebda-cli/frappe"
+import (
+	"errors"
+	"strings"
+
+	"github.com/ahmedsat/ebda-cli/frappe"
+)
 
 type FarmFarmer struct {
 	BaseInnerTable
@@ -53,5 +58,32 @@ func (f Farm) DocTypeName() string {
 
 func (f *Farm) Update() (err error) {
 	f, err = frappe.UpdateDoc(f)
+	return
+}
+
+func GetFarmByCode(code string) (f Farm, err error) {
+
+	if code == "" {
+		return
+	}
+
+	if !strings.HasPrefix(code, "EG/") {
+		code = "EG/" + code
+	}
+
+	farms, err := frappe.Get[Farm](frappe.Filters{frappe.NewFilter("farm_id", frappe.Eq, code)}, nil, nil)
+	if err != nil {
+		return
+	}
+	if len(farms) > 1 {
+		err = errors.New("more than one farm found")
+	}
+
+	if len(farms) < 1 {
+		err = errors.New("no farm found")
+	}
+
+	f = farms[0]
+
 	return
 }

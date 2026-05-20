@@ -139,22 +139,24 @@ func getTsv() (err error) {
 	sb := strings.Builder{}
 	io := utils.SyncIoWriter{Writer: &sb}
 
-	fmt.Fprintln(&io, "Training Name\tFarm ID\tFarmer Name (EBDA Training farmers)")
+	fmt.Fprintln(&io, "ID\tTraining Name\tFarm ID\tFarmer Name (EBDA Training farmers)")
 
 	c := atomic.Int64{}
 
 	for _, record := range records {
 		runner.Run(func() error {
 			fmt.Fprintf(os.Stderr, "\r%d/%d (%.2f%%)", c.Add(1), len(records), float64(c.Load())/float64(len(records))*100)
-			record, err := frappe.Get1[types.EbdaTraining](record.Name)
+			record, err := frappe.GetCached1[types.EbdaTraining](record.Name)
 			if err != nil {
 				return err
 			}
 			for _, farmer := range record.Farmers {
-				fmt.Fprintf(&io, "%s\t%s\t%s\n",
+				fmt.Fprintf(&io, "%s\t%s\t%s\t%s\t%s\n",
+					record.Name,
 					record.Topic,
 					record.FarmID,
 					farmer.FarmerName,
+					record.Date,
 				)
 			}
 			return nil
@@ -216,7 +218,7 @@ func getData(file string) error {
 		runner.Run(func() (err error) {
 			fmt.Fprintf(os.Stderr, "\r%d/%d", c.Add(1), len(farms))
 
-			farm, err := frappe.Get1[types.Farm](farm.Name)
+			farm, err := frappe.GetCached1[types.Farm](farm.Name)
 			if err != nil {
 				return
 			}
@@ -258,7 +260,7 @@ func getData(file string) error {
 		runner.Run(func() (err error) {
 			fmt.Fprintf(os.Stderr, "\r%d/%d", c.Add(1), len(ts))
 
-			t, err := frappe.Get1[types.EbdaTraining](t.Name)
+			t, err := frappe.GetCached1[types.EbdaTraining](t.Name)
 			if err != nil {
 				return err
 			}

@@ -281,7 +281,7 @@ func (u *Update) NewFarms() error {
 
 	missingSet := make(map[string]struct{})
 	for _, farm := range farms {
-		app, err := frappe.Get1[types.FarmApplication](farm.FarmApplicationID)
+		app, err := frappe.GetCached1[types.FarmApplication](farm.FarmApplicationID)
 		if err != nil {
 			return err
 		}
@@ -531,6 +531,7 @@ func (md MapData) Overlapped(other MapData) (float64, error) {
 }
 
 func (u *Update) Maps() (err error) {
+
 	mapsList, err := frappe.Get[types.MapRecord](nil, nil, nil)
 	if err != nil {
 		u.logErr("Maps", err)
@@ -588,7 +589,7 @@ func (u *Update) Maps() (err error) {
 			data, ok := MapsMap.Map[m.Farm]
 			MapsMap.RUnlock()
 			if !ok {
-				farm, err := frappe.Get1[types.Farm](m.Farm)
+				farm, err := frappe.GetCached1[types.Farm](m.Farm)
 				if farm.FarmStatus == "Cancelled" {
 					return nil
 				}
@@ -607,6 +608,7 @@ func (u *Update) Maps() (err error) {
 				MapsMap.Unlock()
 			} else {
 				data.MapsIds = append(data.MapsIds, m.Name)
+				overlapped := false
 				for j, poly := range data.Polygons {
 					polys, err := poly.Union(geo.Polygon{Ring: m.Coordinates})
 					if err != nil {
@@ -614,10 +616,13 @@ func (u *Update) Maps() (err error) {
 					}
 					if len(polys) == 1 {
 						data.Polygons[j] = polys[0]
+						overlapped = true
 						break
 					}
 				}
-				data.Polygons = append(data.Polygons, geo.Polygon{Ring: m.Coordinates})
+				if !overlapped {
+					data.Polygons = append(data.Polygons, geo.Polygon{Ring: m.Coordinates})
+				}
 			}
 
 			MapsMap.Lock()

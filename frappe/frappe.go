@@ -18,8 +18,8 @@ import (
 )
 
 type FrappeDoctype interface {
-	DocTypeName() string
-	DocName() string
+	DocTypeName() string // the name of the doctype
+	DocName() string     // the actual name of the document
 }
 
 var client *http.Client

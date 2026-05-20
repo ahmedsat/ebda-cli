@@ -155,18 +155,17 @@ func (f FarmFollowUp) DocTypeName() string {
 	return "Farm FollowUp"
 }
 
-// const sep = "\t"
-
 func (f *FarmFollowUp) Rate() error {
+
 	if f.Rated {
 		return nil
 	}
 
-	follow, err := frappe.Get1[FarmFollowUp](f.Name)
+	// fmt.Fprintln(os.Stderr, "Uncomment the lines below")
+	follow, err := frappe.GetCached1[FarmFollowUp](f.Name)
 	if err != nil {
 		return err
 	}
-
 	*f = follow
 
 	checks := []utils.Check{

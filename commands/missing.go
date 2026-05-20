@@ -355,7 +355,7 @@ func HandleFarmers(collect *kobo.Collect, submissionState *SubmissionMissingStat
 		return nil
 	}
 
-	farm, err := frappe.Get1[types.Farm](collect.Farm)
+	farm, err := frappe.GetCached1[types.Farm](collect.Farm)
 	if err != nil {
 		return err
 	}
@@ -530,7 +530,7 @@ func UpdateFarmerName(farm *types.Farm, num int64, newFarmer kobo.CollectFarmers
 	}
 
 	for _, training := range trainings {
-		training, err = frappe.Get1[types.EbdaTraining](training.Name)
+		training, err = frappe.GetCached1[types.EbdaTraining](training.Name)
 		if err != nil {
 			return err
 		}
@@ -552,7 +552,7 @@ func UpdateFarmerName(farm *types.Farm, num int64, newFarmer kobo.CollectFarmers
 	}
 
 	for _, followUp := range followUps {
-		followUp, err = frappe.Get1[types.FarmFollowUp](followUp.Name)
+		followUp, err = frappe.GetCached1[types.FarmFollowUp](followUp.Name)
 		if err != nil {
 			return err
 		}

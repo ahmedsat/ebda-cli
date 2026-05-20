@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/ahmedsat/ebda-cli/frappe"
@@ -50,18 +51,6 @@ func (m *MapRecord) Parse() error {
 		return err
 	}
 
-	// if m.Farm != "" {
-	// 	m.Farm = strings.TrimSpace(m.Farm)
-
-	// 	f, err := frappe.Get1[Farm](m.Farm)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	m.Farm = f.Name
-
-	// 	m.Name = fmt.Sprintf("%s - %s - %s", f.ArabicName, f.Region, f.FarmId)
-	// }
-
 	if m.Coordinates[0] != m.Coordinates[len(m.Coordinates)-1] {
 		m.Coordinates = append(m.Coordinates, m.Coordinates[0])
 	}
@@ -79,7 +68,10 @@ func (m *MapRecord) Parse() error {
 	return nil
 }
 
-func RecordsToKML(records []MapRecord) ([]byte, error) {
+func MapRecordsToKML(records []MapRecord) ([]byte, error) {
+
+	slices.SortFunc(records, func(m1, m2 MapRecord) int { return strings.Compare(m1.Farm, m2.Farm) })
+
 	var placemarks []utils.Placemark
 
 	for i := range records {
@@ -94,16 +86,16 @@ func RecordsToKML(records []MapRecord) ([]byte, error) {
 		}
 		coords := buildKMLCoordinates(r.Coordinates)
 
-		farm, err := frappe.Get1[Farm](r.Farm)
+		farm, err := frappe.GetCached1[Farm](r.Farm)
 		if err != nil {
 			return nil, err
 		}
 
 		pm := utils.Placemark{
-			Name: fmt.Sprintf("%s - %s - %s", farm.ArabicName, farm.Region, farm.FarmId),
+			Name: fmt.Sprintf("%s - %s - %s - %s", farm.ArabicName, farm.Region, farm.FarmId, r.Name),
 			Description: fmt.Sprintf(
-				"Farm: %s\nSeason: %s\nArea: %.2f Ha",
-				r.Farm, r.Season, farm.Area*4200/10000,
+				"Creator: %s\nFarm: %s\nSeason: %s\nArea: %.2f Fed",
+				r.Owner, r.Farm, r.Season, farm.Area,
 			),
 			Style: utils.Style{
 				PolyStyle: utils.PolyStyle{
@@ -149,4 +141,21 @@ func buildKMLCoordinates(coords []geo.Coord) string {
 	fmt.Fprintf(&b, "%f,%f", first.Lng, first.Lat)
 
 	return strings.TrimSpace(b.String())
+}
+
+func GetMapColored(farm, color string) (result []MapRecord, err error) {
+	result, err = frappe.Get[MapRecord](frappe.Filters{frappe.NewFilter("farm", frappe.Eq, farm)}, nil, nil)
+	if err != nil {
+		return
+	}
+
+	for i := range result {
+		err = result[i].Parse()
+		if err != nil {
+			return
+		}
+		result[i].Color = color
+	}
+
+	return
 }
