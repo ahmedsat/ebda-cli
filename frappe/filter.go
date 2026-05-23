@@ -10,13 +10,14 @@ import (
 type FilterComparator string
 
 const (
-	Eq  FilterComparator = "="
-	Gt  FilterComparator = ">"
-	Lt  FilterComparator = "<"
-	Gte FilterComparator = ">="
-	Lte FilterComparator = "<="
-	Neq FilterComparator = "!="
-	In  FilterComparator = "in"
+	Eq   FilterComparator = "="
+	Gt   FilterComparator = ">"
+	Lt   FilterComparator = "<"
+	Gte  FilterComparator = ">="
+	Lte  FilterComparator = "<="
+	Neq  FilterComparator = "!="
+	In   FilterComparator = "in"
+	Like FilterComparator = "like"
 )
 
 type Filter struct {
@@ -29,8 +30,10 @@ func FiltersValueList(vals ...string) string {
 	sb := strings.Builder{}
 	sb.WriteString("[")
 	for _, val := range vals {
-		sb.WriteString("\"" + val + "\"")
-		sb.WriteString(",")
+		sb.WriteByte('"')
+		sb.WriteString(val)
+		sb.WriteByte('"')
+		sb.WriteByte(',')
 	}
 	temp := sb.String()[:len(sb.String())-1]
 	sb.Reset()
@@ -78,8 +81,10 @@ func (l List) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("[")
 	for _, item := range l {
-		sb.WriteString("\"" + item + "\"")
-		sb.WriteString(",")
+		sb.WriteByte('"')
+		sb.WriteString(item)
+		sb.WriteByte('"')
+		sb.WriteByte(',')
 	}
 	temp := sb.String()[:len(sb.String())-1]
 	sb.Reset()
