@@ -207,9 +207,11 @@ func (f *FarmFollowUp) Rate() error {
 		checks = append(checks, utils.Check{Name: "لم يتم ذكر المنتجات الحيوية المستخدمة", Ok: len(f.BiosProductsDetails) > 0, Weight: 3})
 	}
 
-	if f.VisitDate == "" {
+	if strings.HasPrefix(f.Name, "FollowUp") {
+	} else if f.VisitDate == "" {
 		checks = append(checks, utils.Check{Name: "لا يوجد تاريخ زيارة", Ok: true, Weight: 3})
 	} else {
+
 		creation, err := time.Parse(time.DateOnly, strings.Split(f.Creation, " ")[0])
 		if err != nil {
 			return err
