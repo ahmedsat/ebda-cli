@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/ahmedsat/ebda-cli/frappe"
 	"github.com/ahmedsat/ebda-cli/frappe/types"
@@ -109,7 +110,10 @@ func FakeFollowUp(code, eng string) {
 		FollowerAssessment: "المزرعة بحالة جيدة",
 		Recommendations:    "لا يوجد",
 		StorageExist:       "لا",
+		VisitDate:          time.Now().Format(time.DateOnly),
 	}
+
+	f.Name = fmt.Sprintf("FollowUp-%s-%s", f.Farm, time.Now().Format(time.DateTime))
 
 	_, err = frappe.Create(f)
 	if err != nil {
@@ -175,17 +179,21 @@ func Kml() {
 	}
 	fmt.Println()
 
+	runner := utils.NewSyncRunner(len(regions), 0)
 	for k, v := range regions {
-		bytes, err := types.MapRecordsToKML(v)
-		if err != nil {
-			panic(err)
-		}
-		err = os.WriteFile(fmt.Sprintf("kml/%s.kml", k), bytes, 0666)
-		if err != nil {
-			panic(err)
-		}
+		runner.Run(func() error {
+			bytes, err := types.MapRecordsToKML(v)
+			if err != nil {
+				return err
+			}
+			err = os.WriteFile(fmt.Sprintf("kml/%s.kml", k), bytes, 0666)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 	}
-
+	runner.Wait()
 }
 
 func area() {

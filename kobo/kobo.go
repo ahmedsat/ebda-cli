@@ -206,7 +206,7 @@ func GetAssetsExt[T KoboAsset](q Query, limit int, start int) (result AssetsResp
 	decoder := json.NewDecoder(resp.Body)
 
 	// utils.SaveHttpResponse(*resp)
-	decoder.DisallowUnknownFields()
+	// decoder.DisallowUnknownFields()
 
 	err = decoder.Decode(&result)
 	if err != nil {
