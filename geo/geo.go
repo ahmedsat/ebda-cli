@@ -387,29 +387,6 @@ func convexHull(points []Coord) []Coord {
 	return append(hull, hull[0])
 }
 
-func samePolygon(a, b Polygon) bool {
-	if len(a.Ring) != len(b.Ring) {
-		return false
-	}
-
-	n := len(a.Ring) - 1
-
-	for shift := range n {
-		match := true
-		for i := range n {
-			if !equal(a.Ring[i], b.Ring[(i+shift)%n]) {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-
-	return false
-}
-
 type triangle [3]Coord
 
 func (p Polygon) OverlapArea(other Polygon) (float64, error) {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/ahmedsat/ebda-cli/frappe"
 	"github.com/ahmedsat/ebda-cli/geo"
-	"github.com/ahmedsat/ebda-cli/utils"
+	"github.com/ahmedsat/ebda-cli/geo/kml"
 )
 
 type MapRecord struct {
@@ -72,7 +72,7 @@ func MapRecordsToKML(records []MapRecord) ([]byte, error) {
 
 	slices.SortFunc(records, func(m1, m2 MapRecord) int { return strings.Compare(m1.Farm, m2.Farm) })
 
-	var placemarks []utils.Placemark
+	var placemarks []kml.Placemark
 
 	for i := range records {
 		r := &records[i]
@@ -91,20 +91,20 @@ func MapRecordsToKML(records []MapRecord) ([]byte, error) {
 			return nil, err
 		}
 
-		pm := utils.Placemark{
+		pm := kml.Placemark{
 			Name: fmt.Sprintf("%s - %s - %s - %s", farm.ArabicName, farm.Region, farm.FarmId, r.Name),
 			Description: fmt.Sprintf(
 				"Creator: %s\nFarm: %s\nSeason: %s\nArea: %.2f Fed",
 				r.Owner, r.Farm, r.Season, farm.Area,
 			),
-			Style: utils.Style{
-				PolyStyle: utils.PolyStyle{
-					Color: utils.KmlColor(r.Color),
+			Style: kml.Style{
+				PolyStyle: kml.PolyStyle{
+					Color: kml.KmlColor(r.Color),
 				},
 			},
-			Polygon: utils.Polygon{
-				OuterBoundary: utils.OuterBoundary{
-					LinearRing: utils.LinearRing{
+			Polygon: kml.Polygon{
+				OuterBoundary: kml.OuterBoundary{
+					LinearRing: kml.LinearRing{
 						Coordinates: coords,
 					},
 				},
@@ -116,9 +116,9 @@ func MapRecordsToKML(records []MapRecord) ([]byte, error) {
 		fmt.Fprintf(os.Stderr, "\r%f%%", float64(i+1)/float64(len(records))*100)
 	}
 
-	k := utils.KML{
+	k := kml.KML{
 		Xmlns: "http://www.opengis.net/kml/2.2",
-		Document: utils.Document{
+		Document: kml.Document{
 			Name:       "Map Records",
 			Placemarks: placemarks,
 		},

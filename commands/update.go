@@ -322,8 +322,23 @@ func (u *Update) NewFarms() error {
 
 func (u *Update) FollowUp() (err error) {
 
+	ctx := context.Background()
+
+	names, err := u.ReadRange(ctx, fixNamesRange)
+	if err != nil {
+		return err
+	}
+
+	namesMap := make(map[string]string)
+	for _, name := range names {
+		if len(name) < 2 {
+			continue
+		}
+		namesMap[name[0].(string)] = name[1].(string)
+	}
+
 	values := [][]any{
-		{"Visit ID", "Farm Code", "Visit Date", "Creation", "Rate", "Issues"},
+		{"Visit ID", "Farm Code", "Visit Date", "Creation", "Rate", "Issues", "Follower Name"},
 	}
 
 	bar := u.progress.AddBar(100,
@@ -359,7 +374,15 @@ func (u *Update) FollowUp() (err error) {
 		return err
 	}
 
+	missingSet := make(map[string]struct{})
+
 	for _, followUp := range followUps {
+
+		engName, ok := namesMap[followUp.FollowerName]
+		if !ok {
+			missingSet[followUp.FollowerName] = struct{}{}
+		}
+
 		values = append(values, []any{
 			followUp.Name,
 			followUp.FarmCode,
@@ -367,10 +390,26 @@ func (u *Update) FollowUp() (err error) {
 			followUp.Creation,
 			followUp.RatePercent,
 			strings.Join(followUp.Issues, "\n"),
+			engName,
 		})
 	}
+	err = u.ClearAndUpdateRange(context.Background(), followUpRange, values)
+	if err != nil {
+		return err
+	}
 
-	return u.ClearAndUpdateRange(context.Background(), followUpRange, values)
+	// missing names
+	if len(missingSet) > 0 {
+		toAppend := make([][]any, 0, len(missingSet))
+		for name := range missingSet {
+			toAppend = append(toAppend, []any{name})
+		}
+		if err := u.Append(ctx, fixNamesRange, toAppend); err != nil {
+			return err
+		}
+	}
+
+	return
 }
 
 func (u *Update) PGS() (err error) {

@@ -39,6 +39,34 @@ func deleteMapByFarmCode() {
 	}
 }
 
+func deleteOldMap() {
+	for _, m := range os.Args[1:] {
+		f, err := types.GetFarmByCode(m)
+		if err != nil {
+			fmt.Println(m, err)
+			continue
+		}
+		maps, err := frappe.Get[types.MapRecord](frappe.Filters{
+			frappe.NewFilter("farm", frappe.Eq, f.Name),
+		}, nil, nil)
+		if err != nil {
+			fmt.Println(m, err)
+			continue
+		}
+
+		for _, m := range maps {
+			if m.Color == "#181818" {
+				continue
+			}
+			err := frappe.Delete[types.MapRecord](m.Name)
+			if err != nil {
+				fmt.Println(m.Name, err)
+			}
+		}
+		fmt.Println(m)
+	}
+}
+
 func deleteMap() {
 	for _, m := range os.Args[1:] {
 		err := frappe.Delete[types.MapRecord](m)
@@ -163,24 +191,38 @@ func Kml() {
 		panic(err)
 	}
 
-	regions := map[string][]types.MapRecord{}
-	for i, m := range maps {
-		fmt.Printf("\r%d/%d (%0.2f%%)", i, len(maps), float64(i)/float64(len(maps))*100)
-		if m.Farm == "" {
-			continue
-		}
-		f, err := frappe.GetCached1[types.Farm](m.Farm)
-		if err != nil {
-			panic(err)
-		}
+	// regions := map[string][]types.MapRecord{}
+	regions := utils.NewLockableMap[string, []types.MapRecord]()
+	runner := utils.NewSyncRunner(50, 100)
 
-		m.Color = RandomHexColor(f.FarmId)
-		regions[f.Region] = append(regions[f.Region], m)
+	i := atomic.Int64{}
+	for _, m := range maps {
+		runner.Run(func() error {
+			defer func() {
+				i := i.Add(1)
+				fmt.Printf("\r%d/%d (%0.2f%%)", i, len(maps), float64(i)/float64(len(maps))*100)
+			}()
+			if m.Farm == "" {
+				return nil
+			}
+			f, err := frappe.GetCached1[types.Farm](m.Farm)
+			if err != nil {
+				return err
+			}
+
+			m.Color = RandomHexColor(f.FarmId)
+			regions.Lock()
+			regions.Map[f.Region] = append(regions.Map[f.Region], m)
+			regions.Unlock()
+			return nil
+		})
 	}
+
+	runner.Wait()
 	fmt.Println()
 
-	runner := utils.NewSyncRunner(len(regions), 0)
-	for k, v := range regions {
+	runner = utils.NewSyncRunner(len(regions.Map), 0)
+	for k, v := range regions.Map {
 		runner.Run(func() error {
 			bytes, err := types.MapRecordsToKML(v)
 			if err != nil {
@@ -214,7 +256,7 @@ func area() {
 			continue
 		}
 
-		fmt.Printf("%s => %0.2f", id, record.Area_in_feddan)
+		fmt.Printf("%s => %0.2f\n", id, record.Area_in_feddan)
 	}
 
 }

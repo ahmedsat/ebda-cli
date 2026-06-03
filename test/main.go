@@ -3,12 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"slices"
-	"time"
 
 	"github.com/ahmedsat/ebda-cli/config"
-	"github.com/ahmedsat/ebda-cli/frappe"
-	"github.com/ahmedsat/ebda-cli/frappe/types"
 )
 
 func init() {
@@ -20,47 +16,24 @@ func init() {
 }
 
 /*
+EG/1300 EG/1351 EG/3467
+*/
 
- */
+type point struct {
+	Lat float64 `json:"lat"`
+	Lng float64 `json:"lng"`
+}
 
 func main() {
 
-	follows, err := frappe.Get[types.FarmFollowUp](frappe.Filters{
-		frappe.NewFilter("name", frappe.Like, "%FollowUp-%"),
-	}, nil, nil)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	// asset, err := kobo.GetAssetByID[kobo.PGSNew](738885331)
+	// if err != nil {
+	// 	fmt.Fprintln(os.Stderr, err)
+	// 	os.Exit(1)
+	// }
 
-	codes := []string{}
-
-	for i, f := range follows {
-		fmt.Fprintf(os.Stderr, "\r%d/%d (%.2f%%) ", i, len(follows), float64(i)/float64(len(follows))*100)
-		if slices.Contains(codes, f.FarmCode) {
-			f.Farm = "test"
-			r, err := frappe.UpdateDoc(f)
-			if err != nil {
-				fmt.Printf("f:%s =>> %s", f.Name, err)
-			}
-			if r.Farm != "test" {
-				fmt.Printf("f:%s", f.Name)
-			}
-			continue
-		}
-		date, err := time.Parse(time.DateTime, f.Creation)
-		if err != nil {
-			fmt.Printf("f:%s =>> %s", f.Name, err)
-			continue
-		}
-		f.VisitDate = date.Format(time.DateOnly)
-		_, err = frappe.UpdateDoc(f)
-		if err != nil {
-			fmt.Printf("f:%s =>> %s", f.Name, err)
-			continue
-		}
-		codes = append(codes, f.FarmCode)
-	}
+	// fmt.Println(time.Unix(int64(asset.ValidationStatus.Timestamp), 0))
+	// fmt.Println(asset.ValidationStatus.ByWhom)
 
 	// area()
 	// OverlapKml()
@@ -69,4 +42,5 @@ func main() {
 	// deletable()
 	// deleteMap()
 	// deleteMapByFarmCode()
+	deleteOldMap()
 }

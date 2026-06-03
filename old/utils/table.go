@@ -49,14 +49,16 @@ func TablePrinterCsv(t Table) string {
 		func(s string) string { return "\"" + s + "\"" },
 	)
 
-	sb.WriteString(strings.Join(t.GetHeader(), ",") + "\n")
+	sb.WriteString(strings.Join(t.GetHeader(), ","))
+	sb.WriteString("\n")
 	for _, row := range t.GetRows() {
 		UpdateF(
 			row,
 			TruePredicate[string](),
 			func(s string) string { return "\"" + s + "\"" },
 		)
-		sb.WriteString(strings.Join(row, ",") + "\n")
+		sb.WriteString(strings.Join(row, ","))
+		sb.WriteString("\n")
 	}
 
 	// remove last newline
@@ -73,14 +75,16 @@ func TablePrinterTsv(t Table) string {
 		TruePredicate[string](),
 		func(s string) string { return "\"" + s + "\"" },
 	)
-	sb.WriteString(strings.Join(t.GetHeader(), "\t") + "\n")
+	sb.WriteString(strings.Join(t.GetHeader(), "\t"))
+	sb.WriteString("\n")
 	for _, row := range t.GetRows() {
 		UpdateF(
 			row,
 			TruePredicate[string](),
 			func(s string) string { return "\"" + s + "\"" },
 		)
-		sb.WriteString(strings.Join(row, "\t") + "\n")
+		sb.WriteString(strings.Join(row, "\t"))
+		sb.WriteString("\n")
 	}
 	return sb.String()
 

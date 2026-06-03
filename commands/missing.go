@@ -23,6 +23,7 @@ import (
 	"github.com/ahmedsat/ebda-cli/config"
 	"github.com/ahmedsat/ebda-cli/frappe"
 	"github.com/ahmedsat/ebda-cli/frappe/types"
+	"github.com/ahmedsat/ebda-cli/geo/geojson"
 	"github.com/ahmedsat/ebda-cli/kobo"
 	"github.com/ahmedsat/ebda-cli/utils"
 	"github.com/gen2brain/go-fitz"
@@ -313,18 +314,34 @@ func HandleSoil(collect *kobo.Collect, submissionState *SubmissionMissingState) 
 		CollectionDatetime: collect.Today,
 		NamingSeries:       "Soil-kobo-.YY.-.MM.-",
 	}
-	features := []utils.Feature{}
+
+	features := make([]geojson.Feature, 0, len(collect.Points))
 
 	for _, s := range collect.Points {
 		lat, lng, _, _, err := s.GeoInfo()
 		if err != nil {
 			return err
 		}
-		features = append(features, utils.NewPointFeature(s.PointStr, lat, lng))
+
+		features = append(features, geojson.Feature{
+			Type: "Feature",
+			Properties: map[string]interface{}{
+				"name": s.PointStr,
+			},
+			Geometry: geojson.GeometryWrapper{
+				Geometry: geojson.Point{
+					Coordinates: [2]float64{lng, lat}, // GeoJSON = [lon, lat]
+				},
+			},
+		})
 	}
 
-	geojson := utils.NewGeoJSON(features...)
-	b, err := json.Marshal(geojson)
+	fc := geojson.FeatureCollection{
+		Type:     "FeatureCollection",
+		Features: features,
+	}
+
+	b, err := json.Marshal(fc)
 	if err != nil {
 		return err
 	}
